@@ -682,8 +682,8 @@ function renderGEX(data, dateLabel) {
 // ── IV Smile ─────────────────────────────────────────────────────────────────
 function renderIV(data, dateLabel) {
   const wrap = clearWrap('wrap-iv');
-  const W = 840, H = 500;
-  const margin = { top: 60, right: 150, bottom: 60, left: 80 };
+  const W = 880, H = 520;
+  const margin = { top: 60, right: 170, bottom: 60, left: 80 };
   const innerW = W - margin.left - margin.right;
   const innerH = H - margin.top - margin.bottom;
 
@@ -699,24 +699,43 @@ function renderIV(data, dateLabel) {
 
   const exps = data.expirations;
   const spot = data.spot;
-  const sMin = 62000, sMax = 80000;
   const ivValid = v => v > 8 && v < 100;
-
   const EXP_LINE_COLORS = ['#FFD54F', '#4FC3F7', '#AB47BC'];
 
+  // Build series list and auto-detect x range from valid data
+  const series = [];
+  const allValidStrikes = [];
   let allIVs = [];
+
   for (let i = 0; i < exps.length; i++) {
     const exp = exps[i];
-    for (const [k, v] of Object.entries(data.call_iv[exp] || {})) {
-      if (+k >= sMin && +k <= sMax && ivValid(v)) allIVs.push(v);
-    }
-    for (const [k, v] of Object.entries(data.put_iv[exp] || {})) {
-      if (+k >= sMin && +k <= sMax && ivValid(v)) allIVs.push(v);
+    const color = EXP_LINE_COLORS[i] || '#ccc';
+    const expLabel = (data.expiry_labels || {})[exp] || exp;
+
+    for (const [side, dict] of [['call', data.call_iv[exp] || {}], ['put', data.put_iv[exp] || {}]]) {
+      const pts = Object.entries(dict)
+        .map(([k, v]) => ({ s: +k, iv: v }))
+        .filter(d => ivValid(d.iv))
+        .sort((a, b) => a.s - b.s);
+      if (pts.length < 2) continue;
+      pts.forEach(p => { allValidStrikes.push(p.s); allIVs.push(p.iv); });
+      series.push({ exp, side, color, expLabel, pts, id: `iv-${i}-${side}` });
     }
   }
+
+  // X range: trim noisy extremes (use 3rd–97th percentile of strikes)
+  const sSorted = [...allValidStrikes].sort((a, b) => a - b);
+  const rawMin = sSorted[Math.floor(sSorted.length * 0.03)] || sSorted[0];
+  const rawMax = sSorted[Math.ceil(sSorted.length * 0.97) - 1] || sSorted[sSorted.length - 1];
+  const sMin = Math.floor(rawMin / 1000) * 1000;
+  const sMax = Math.ceil(rawMax  / 1000) * 1000;
+
+  // Clamp series pts to range
+  series.forEach(s => { s.pts = s.pts.filter(p => p.s >= sMin && p.s <= sMax); });
+
   if (allIVs.length === 0) allIVs = [15, 45];
   const ivMin = Math.max(0, d3.min(allIVs) - 2);
-  const ivMax = Math.min(100, d3.max(allIVs) + 2);
+  const ivMax = Math.min(100, d3.max(allIVs) + 4);
 
   const xScale = d3.scaleLinear().domain([sMin, sMax]).range([0, innerW]);
   const yScale = d3.scaleLinear().domain([ivMin, ivMax]).range([innerH, 0]);
@@ -734,72 +753,91 @@ function renderIV(data, dateLabel) {
   }
 
   // Spot line
-  g.append('line').attr('x1', xScale(spot)).attr('x2', xScale(spot))
-    .attr('y1', 0).attr('y2', innerH)
-    .attr('stroke', '#ffd740').attr('stroke-width', 2).attr('stroke-dasharray', '6 3');
-  g.append('text').attr('x', xScale(spot) + 6).attr('y', 16)
-    .attr('fill', '#ffd740').attr('font-size', '12px').attr('font-weight', 'bold')
-    .text('¥' + Math.round(spot).toLocaleString());
+  if (spot >= sMin && spot <= sMax) {
+    g.append('line').attr('x1', xScale(spot)).attr('x2', xScale(spot))
+      .attr('y1', 0).attr('y2', innerH)
+      .attr('stroke', '#ffd740').attr('stroke-width', 2).attr('stroke-dasharray', '6 3');
+    g.append('text').attr('x', xScale(spot) + 6).attr('y', 16)
+      .attr('fill', '#ffd740').attr('font-size', '12px').attr('font-weight', 'bold')
+      .text('¥' + Math.round(spot).toLocaleString());
+  }
 
   const lineGen = d3.line()
     .x(d => xScale(d.s))
     .y(d => yScale(d.iv))
-    .curve(d3.curveMonotoneX);
+    .curve(d3.curveMonotoneX)
+    .defined(d => ivValid(d.iv));
 
-  // Draw lines and dots
-  for (let i = 0; i < exps.length; i++) {
-    const exp = exps[i];
-    const color = EXP_LINE_COLORS[i] || '#ccc';
-    const expLabel = (data.expiry_labels || {})[exp] || exp;
-
-    for (const [side, dict] of [['call', data.call_iv[exp] || {}], ['put', data.put_iv[exp] || {}]]) {
-      const pts = Object.entries(dict)
-        .map(([k, v]) => ({ s: +k, iv: v }))
-        .filter(d => d.s >= sMin && d.s <= sMax && ivValid(d.iv))
-        .sort((a, b) => a.s - b.s);
-
-      if (pts.length < 2) continue;
-
-      g.append('path')
-        .datum(pts)
-        .attr('fill', 'none')
-        .attr('stroke', color)
-        .attr('stroke-width', side === 'call' ? 2.5 : 2)
-        .attr('stroke-dasharray', side === 'put' ? '6 3' : 'none')
-        .attr('opacity', 0.9)
-        .attr('d', lineGen);
-
-      // Visible dots
-      g.selectAll(null).data(pts)
-        .enter().append('circle')
-        .attr('cx', d => xScale(d.s))
-        .attr('cy', d => yScale(d.iv))
-        .attr('r', 4)
-        .attr('fill', color)
-        .attr('opacity', 0.75)
-        .style('pointer-events', 'none');
-
-      // Larger invisible circles on top as hit targets
-      g.selectAll(null).data(pts)
-        .enter().append('circle')
-        .attr('cx', d => xScale(d.s))
-        .attr('cy', d => yScale(d.iv))
-        .attr('r', 10)
-        .attr('fill', 'transparent')
-        .style('pointer-events', 'all')
-        .style('cursor', 'crosshair')
-        .on('mouseover', (ev, d) => showTip(ev,
-          `<b>¥${d.s.toLocaleString()}</b> — ${expLabel} ${side === 'call' ? 'コール' : 'プット'}<br>` +
-          `IV: <span style="color:${color}">${d.iv.toFixed(2)}%</span>`
-        ))
-        .on('mousemove', moveTip)
-        .on('mouseout', hideTip);
-    }
+  // Draw lines — store group refs for toggling
+  const lineGroups = {};
+  for (const s of series) {
+    const grp = g.append('g').attr('id', s.id);
+    grp.append('path')
+      .datum(s.pts)
+      .attr('fill', 'none')
+      .attr('stroke', s.color)
+      .attr('stroke-width', s.side === 'call' ? 2.5 : 1.8)
+      .attr('stroke-dasharray', s.side === 'put' ? '6 3' : 'none')
+      .attr('opacity', 0.9)
+      .attr('d', lineGen);
+    lineGroups[s.id] = { grp, series: s, visible: true };
   }
 
+  // Hover markers (one per series, hidden by default)
+  const hoverMarkers = {};
+  for (const s of series) {
+    hoverMarkers[s.id] = g.append('circle')
+      .attr('r', 5).attr('fill', s.color)
+      .attr('stroke', '#161b22').attr('stroke-width', 1.5)
+      .attr('opacity', 0).style('pointer-events', 'none');
+  }
+
+  // Hover crosshair
+  const hoverLine = g.append('line')
+    .attr('y1', 0).attr('y2', innerH)
+    .attr('stroke', '#8b949e').attr('stroke-width', 1)
+    .attr('stroke-dasharray', '3 3').attr('opacity', 0)
+    .style('pointer-events', 'none');
+
+  // Invisible overlay for mouse tracking
+  g.append('rect')
+    .attr('x', 0).attr('y', 0).attr('width', innerW).attr('height', innerH)
+    .attr('fill', 'transparent').style('pointer-events', 'all')
+    .on('mousemove', function(ev) {
+      const [mx] = d3.pointer(ev, this);
+      const xVal = xScale.invert(mx);
+      hoverLine.attr('x1', mx).attr('x2', mx).attr('opacity', 0.6);
+
+      const tipRows = [`<b>¥${Math.round(xVal).toLocaleString()}</b>`];
+      for (const s of series) {
+        if (!lineGroups[s.id].visible) {
+          hoverMarkers[s.id].attr('opacity', 0);
+          continue;
+        }
+        const pts = s.pts;
+        if (pts.length === 0) continue;
+        const nearest = pts.reduce((a, b) =>
+          Math.abs(b.s - xVal) < Math.abs(a.s - xVal) ? b : a);
+        hoverMarkers[s.id]
+          .attr('cx', xScale(nearest.s)).attr('cy', yScale(nearest.iv))
+          .attr('opacity', 1);
+        const sl = s.side === 'call' ? 'C' : 'P';
+        tipRows.push(`<span style="color:${s.color}">${s.expLabel}${sl}: ${nearest.iv.toFixed(1)}%</span>`);
+      }
+      showTip(ev, tipRows.join('<br>'));
+    })
+    .on('mouseout', function() {
+      hoverLine.attr('opacity', 0);
+      for (const id in hoverMarkers) hoverMarkers[id].attr('opacity', 0);
+      hideTip();
+    });
+
   // X axis
+  const xStep = (sMax - sMin) <= 8000 ? 1000 : 2000;
   const xAxisG = g.append('g').attr('transform', `translate(0,${innerH})`).call(
-    d3.axisBottom(xScale).ticks(8).tickFormat(d => '¥' + (+d / 1000).toFixed(0) + 'k')
+    d3.axisBottom(xScale)
+      .ticks((sMax - sMin) / xStep)
+      .tickFormat(d => '¥' + (+d / 1000).toFixed(0) + 'k')
   );
   xAxisG.selectAll('text').attr('fill', '#c9d1d9').attr('font-size', '12px');
   xAxisG.selectAll('.domain').attr('stroke', '#30363d');
@@ -819,26 +857,45 @@ function renderIV(data, dateLabel) {
     .attr('text-anchor', 'middle').attr('fill', '#8b949e').attr('font-size', '12px')
     .text('Implied Volatility (%)');
 
-  // Legend
+  // Legend with click toggle (group by expiry)
   const legX = innerW + 16;
+  let legYPos = 0;
   for (let i = 0; i < exps.length; i++) {
     const exp = exps[i];
     const color = EXP_LINE_COLORS[i] || '#ccc';
     const label = (data.expiry_labels || {})[exp] || exp;
-    const ly = i * 48;
+    const callId = series.find(s => s.exp === exp && s.side === 'call')?.id;
+    const putId  = series.find(s => s.exp === exp && s.side === 'put')?.id;
 
-    g.append('text').attr('x', legX).attr('y', ly + 5)
+    const legGrp = g.append('g').style('cursor', 'pointer');
+
+    legGrp.append('text').attr('x', legX).attr('y', legYPos + 5)
       .attr('fill', color).attr('font-size', '13px').attr('font-weight', 'bold').text(label);
-    g.append('line').attr('x1', legX).attr('x2', legX + 24)
-      .attr('y1', ly + 18).attr('y2', ly + 18)
+    legGrp.append('line').attr('x1', legX).attr('x2', legX + 24)
+      .attr('y1', legYPos + 18).attr('y2', legYPos + 18)
       .attr('stroke', color).attr('stroke-width', 2.5);
-    g.append('text').attr('x', legX + 28).attr('y', ly + 22)
+    legGrp.append('text').attr('x', legX + 28).attr('y', legYPos + 22)
       .attr('fill', '#8b949e').attr('font-size', '11px').text('コール');
-    g.append('line').attr('x1', legX).attr('x2', legX + 24)
-      .attr('y1', ly + 34).attr('y2', ly + 34)
-      .attr('stroke', color).attr('stroke-width', 2).attr('stroke-dasharray', '6 3');
-    g.append('text').attr('x', legX + 28).attr('y', ly + 38)
+    legGrp.append('line').attr('x1', legX).attr('x2', legX + 24)
+      .attr('y1', legYPos + 34).attr('y2', legYPos + 34)
+      .attr('stroke', color).attr('stroke-width', 1.8).attr('stroke-dasharray', '6 3');
+    legGrp.append('text').attr('x', legX + 28).attr('y', legYPos + 38)
       .attr('fill', '#8b949e').attr('font-size', '11px').text('プット');
+
+    // Click to toggle
+    legGrp.on('click', function() {
+      const wasVisible = lineGroups[callId]?.visible ?? true;
+      for (const id of [callId, putId]) {
+        if (!id || !lineGroups[id]) continue;
+        lineGroups[id].visible = !wasVisible;
+        lineGroups[id].grp.attr('opacity', wasVisible ? 0 : 0.9)
+          .style('pointer-events', wasVisible ? 'none' : null);
+        if (wasVisible && hoverMarkers[id]) hoverMarkers[id].attr('opacity', 0);
+      }
+      legGrp.attr('opacity', wasVisible ? 0.3 : 1);
+    });
+
+    legYPos += 55;
   }
 
   // Title
