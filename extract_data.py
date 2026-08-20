@@ -72,20 +72,24 @@ def extract(csv_path: Path) -> dict:
     MONTHLY_INT = {int(k): v for k, v in MONTHLY.items()}
 
     # ── OI Profile ─────────────────────────────────────────────────────────
+    # Wide range 55k-85k with 500-interval (matches volume chart range)
     oi_by_expiry = {}
     for exp_int, _ in MONTHLY_INT.items():
         exp_str = str(exp_int)
         oi_by_expiry[exp_str] = {"call": {}, "put": {}}
-        mask = (df["expiry"] == exp_int) & (df["strike"].between(64000, 78000))
+        mask = (df["expiry"] == exp_int) & (df["strike"].between(55000, 85000))
         for _, row in df[mask].iterrows():
-            s = str(int(float(row["strike"])))
+            s = int(float(row["strike"]))
+            if s % 500 != 0:
+                continue
+            sk = str(s)
             oi = float(row["oi"])
             side = row["side"]
-            oi_by_expiry[exp_str][side][s] = oi_by_expiry[exp_str][side].get(s, 0) + oi
+            oi_by_expiry[exp_str][side][sk] = oi_by_expiry[exp_str][side].get(sk, 0) + oi
 
     all_oi_strikes = sorted({
         int(s) for s in df["strike"].unique()
-        if 64000 <= s <= 78000 and int(s) % 250 == 0
+        if 55000 <= s <= 85000 and int(s) % 500 == 0
     })
 
     total_call_oi = {}

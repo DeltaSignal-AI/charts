@@ -355,8 +355,8 @@ const EXP_COLORS = {
 // ── OI Profile ────────────────────────────────────────────────────────────────
 function renderOI(data, dateLabel) {
   const wrap = clearWrap('wrap-oi');
-  const W = 840, H = 660;
-  const margin = { top: 68, right: 130, bottom: 44, left: 110 };
+  const W = 880, H = 720;
+  const margin = { top: 60, right: 160, bottom: 44, left: 100 };
   const innerW = W - margin.left - margin.right;
   const innerH = H - margin.top - margin.bottom;
 
@@ -370,7 +370,7 @@ function renderOI(data, dateLabel) {
 
   const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-  const allStrikes = data.strikes.filter(s => s % 250 === 0);
+  const allStrikes = data.strikes.filter(s => s % 500 === 0);
   const exps = data.expirations;
 
   // Total OI per strike (for tooltip)
@@ -413,26 +413,12 @@ function renderOI(data, dateLabel) {
   g.append('line').attr('x1', cx).attr('x2', cx).attr('y1', 0).attr('y2', innerH)
     .attr('stroke', '#30363d').attr('stroke-width', 1);
 
-  // Bars with tooltip
+  // Bars first (drawn below tooltips)
   for (const s of allStrikes) {
     const sk = String(s);
     let callOff = 0, putOff = 0;
-    const cTot = totalCallOI[sk], pTot = totalPutOI[sk];
     const bh = yScale.bandwidth();
     const y = yScale(s);
-
-    // Invisible hit area for tooltip
-    g.append('rect')
-      .attr('x', cx - xScale(pTot)).attr('y', y)
-      .attr('width', xScale(cTot) + xScale(pTot)).attr('height', bh)
-      .attr('fill', 'transparent')
-      .on('mouseover', (ev) => showTip(ev,
-        `<b>¥${s.toLocaleString()}</b><br>` +
-        `コールOI: <span style="color:#4CAF50">${Math.round(cTot).toLocaleString()}枚</span><br>` +
-        `プットOI: <span style="color:#f44336">${Math.round(pTot).toLocaleString()}枚</span>`
-      ))
-      .on('mousemove', moveTip)
-      .on('mouseout', hideTip);
 
     for (let i = 0; i < exps.length; i++) {
       const exp = exps[i];
@@ -453,6 +439,28 @@ function renderOI(data, dateLabel) {
         putOff += poi;
       }
     }
+  }
+
+  // Invisible overlay on top of bars for tooltip (drawn after bars so events fire here)
+  for (const s of allStrikes) {
+    const sk = String(s);
+    const cTot = totalCallOI[sk] || 0;
+    const pTot = totalPutOI[sk] || 0;
+    const bh = yScale.bandwidth();
+    const y = yScale(s);
+    // Full-row hit area spanning both sides
+    g.append('rect')
+      .attr('x', 0).attr('y', y)
+      .attr('width', innerW).attr('height', bh)
+      .attr('fill', 'transparent')
+      .style('pointer-events', 'all')
+      .on('mouseover', (ev) => showTip(ev,
+        `<b>¥${s.toLocaleString()}</b><br>` +
+        `コールOI: <span style="color:#4CAF50">${Math.round(cTot).toLocaleString()}枚</span><br>` +
+        `プットOI: <span style="color:#f44336">${Math.round(pTot).toLocaleString()}枚</span>`
+      ))
+      .on('mousemove', moveTip)
+      .on('mouseout', hideTip);
   }
 
   // Spot line
@@ -490,7 +498,7 @@ function renderOI(data, dateLabel) {
   }
 
   // Y axis
-  const yTicks = allStrikes.filter(s => s % 1000 === 0);
+  const yTicks = allStrikes.filter(s => s % 5000 === 0);
   const yAxisG = g.append('g').call(
     d3.axisLeft(yScale).tickValues(yTicks).tickFormat(d => '¥' + (+d).toLocaleString())
   );
@@ -508,29 +516,31 @@ function renderOI(data, dateLabel) {
     }
   }
 
-  // Side headers — placed inside chart area, well clear of SVG title
-  g.append('text').attr('x', cx + innerW * 0.14).attr('y', 22)
+  // Side headers — in SVG margin area (above plot, no bar overlap)
+  svg.append('text')
+    .attr('x', margin.left + cx + innerW * 0.18).attr('y', 40)
     .attr('text-anchor', 'middle').attr('fill', '#4CAF50').attr('font-size', '13px').attr('font-weight', 'bold')
     .text('コール →');
-  g.append('text').attr('x', cx - innerW * 0.14).attr('y', 22)
+  svg.append('text')
+    .attr('x', margin.left + cx - innerW * 0.18).attr('y', 40)
     .attr('text-anchor', 'middle').attr('fill', '#f44336').attr('font-size', '13px').attr('font-weight', 'bold')
     .text('← プット');
 
-  // Legend
-  const legX = innerW - 110, legY = 36;
+  // Legend — outside chart in right margin
+  const legX = innerW + 16, legY = 0;
   for (let i = 0; i < exps.length; i++) {
     const exp = exps[i];
     const col = EXP_COLORS[i] || EXP_COLORS[0];
     const label = (data.expiry_labels || {})[exp] || exp;
-    const ly = legY + i * 22;
+    const ly = legY + i * 28;
     g.append('rect').attr('x', legX).attr('y', ly).attr('width', 11).attr('height', 11).attr('fill', col.call).attr('opacity', 0.88);
     g.append('rect').attr('x', legX + 15).attr('y', ly).attr('width', 11).attr('height', 11).attr('fill', col.put).attr('opacity', 0.88);
     g.append('text').attr('x', legX + 30).attr('y', ly + 10)
       .attr('fill', '#c9d1d9').attr('font-size', '12px').text(label);
   }
 
-  // Title
-  svg.append('text').attr('x', W / 2).attr('y', 30)
+  // Title (centered, above the コール/プット labels)
+  svg.append('text').attr('x', W / 2).attr('y', 22)
     .attr('text-anchor', 'middle').attr('fill', '#c9d1d9').attr('font-size', '14px').attr('font-weight', 'bold')
     .text(`NK225 ¥${Math.round(data.spot).toLocaleString()} — OI プロファイル — ${dateLabel}`);
 }
@@ -576,7 +586,7 @@ function renderGEX(data, dateLabel) {
     .attr('y1', yScale(0)).attr('y2', yScale(0))
     .attr('stroke', '#8b949e').attr('stroke-width', 1);
 
-  // Bars with tooltip
+  // Bars (drawn first)
   for (const d of gexEntries) {
     g.append('rect')
       .attr('x', xScale(d.strike))
@@ -584,7 +594,17 @@ function renderGEX(data, dateLabel) {
       .attr('y', d.gex >= 0 ? yScale(d.gex) : yScale(0))
       .attr('height', Math.abs(yScale(d.gex) - yScale(0)))
       .attr('fill', d.gex >= 0 ? '#4CAF50' : '#f44336')
-      .attr('opacity', 0.85)
+      .attr('opacity', 0.85);
+  }
+
+  // Full-column invisible hit areas on top (easier to hover)
+  for (const d of gexEntries) {
+    g.append('rect')
+      .attr('x', xScale(d.strike))
+      .attr('width', xScale.bandwidth())
+      .attr('y', 0).attr('height', innerH)
+      .attr('fill', 'transparent')
+      .style('pointer-events', 'all')
       .on('mouseover', (ev) => showTip(ev,
         `<b>¥${d.strike.toLocaleString()}</b><br>` +
         `GEX: <span style="color:${d.gex >= 0 ? '#4CAF50' : '#f44336'}">${d.gex >= 0 ? '+' : ''}${d.gex.toFixed(3)}</span><br>` +
@@ -749,7 +769,7 @@ function renderIV(data, dateLabel) {
         .attr('opacity', 0.9)
         .attr('d', lineGen);
 
-      // Dots with tooltip
+      // Visible dots
       g.selectAll(null).data(pts)
         .enter().append('circle')
         .attr('cx', d => xScale(d.s))
@@ -757,19 +777,23 @@ function renderIV(data, dateLabel) {
         .attr('r', 4)
         .attr('fill', color)
         .attr('opacity', 0.75)
+        .style('pointer-events', 'none');
+
+      // Larger invisible circles on top as hit targets
+      g.selectAll(null).data(pts)
+        .enter().append('circle')
+        .attr('cx', d => xScale(d.s))
+        .attr('cy', d => yScale(d.iv))
+        .attr('r', 10)
+        .attr('fill', 'transparent')
+        .style('pointer-events', 'all')
         .style('cursor', 'crosshair')
-        .on('mouseover', function(ev, d) {
-          d3.select(this).attr('r', 6).attr('opacity', 1);
-          showTip(ev,
-            `<b>¥${d.s.toLocaleString()}</b> — ${expLabel} ${side === 'call' ? 'コール' : 'プット'}<br>` +
-            `IV: <span style="color:${color}">${d.iv.toFixed(2)}%</span>`
-          );
-        })
+        .on('mouseover', (ev, d) => showTip(ev,
+          `<b>¥${d.s.toLocaleString()}</b> — ${expLabel} ${side === 'call' ? 'コール' : 'プット'}<br>` +
+          `IV: <span style="color:${color}">${d.iv.toFixed(2)}%</span>`
+        ))
         .on('mousemove', moveTip)
-        .on('mouseout', function() {
-          d3.select(this).attr('r', 4).attr('opacity', 0.75);
-          hideTip();
-        });
+        .on('mouseout', hideTip);
     }
   }
 
