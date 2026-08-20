@@ -163,6 +163,70 @@
       margin-right: 12px;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Mobile ── */
+    @media (max-width: 700px) {
+      .charts-grid { grid-template-columns: 1fr; }
+      .stats-bar { gap: 14px; }
+      .stat-value { font-size: 15px; }
+    }
+
+    /* ── Calendar Modal ── */
+    #cal-modal {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.72);
+      display: none;
+      align-items: center; justify-content: center;
+      z-index: 200;
+    }
+    .cal-container {
+      position: relative;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 28px 24px 20px;
+      display: flex; gap: 28px;
+      flex-wrap: wrap;
+      max-width: 92vw;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .cal-close {
+      position: absolute; top: 10px; right: 14px;
+      background: none; border: none;
+      color: #8b949e; font-size: 18px; cursor: pointer; line-height: 1;
+    }
+    .cal-close:hover { color: #c9d1d9; }
+    .cal-month-title {
+      font-size: 13px; font-weight: 700; color: #c9d1d9;
+      margin-bottom: 8px; text-align: center;
+    }
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 34px);
+      gap: 3px;
+    }
+    .cal-dow {
+      width: 34px; height: 24px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; color: #8b949e;
+    }
+    .cal-day {
+      width: 34px; height: 34px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; color: #484f58;
+      border-radius: 4px;
+    }
+    .cal-day.avail {
+      color: #c9d1d9; cursor: pointer;
+      background: #21262d;
+    }
+    .cal-day.avail:hover { background: #30363d; }
+    .cal-day.current {
+      background: #4CAF50 !important;
+      color: #0d1117 !important;
+      font-weight: 700;
+    }
   </style>
 </head>
 <body>
@@ -183,12 +247,17 @@
   <button class="nav-btn" id="btn-prev" onclick="navigateDate(1)">◀ 前日</button>
   <select id="date-picker" onchange="loadDate(this.value)"></select>
   <button class="nav-btn" id="btn-next" onclick="navigateDate(-1)">翌日 ▶</button>
+  <button class="nav-btn" onclick="openCalendar()" style="margin-left:8px;">カレンダー</button>
 </div>
 
 <div class="stats-bar" id="stats-bar">
   <div class="stat-item">
     <span class="stat-label">日経225先物</span>
     <span class="stat-value" id="stat-spot">—</span>
+  </div>
+  <div class="stat-item">
+    <span class="stat-label">前日比</span>
+    <span class="stat-value" id="stat-diff">—</span>
   </div>
   <div class="stat-item">
     <span class="stat-label">PCR（全限月）</span>
@@ -205,6 +274,10 @@
   <div class="stat-item">
     <span class="stat-label">GEX フリップ</span>
     <span class="stat-value" id="stat-flip">—</span>
+  </div>
+  <div class="stat-item">
+    <span class="stat-label">フリップまで</span>
+    <span class="stat-value" id="stat-flip-dist">—</span>
   </div>
   <div class="stat-item">
     <span class="stat-label">コールOI</span>
@@ -314,6 +387,24 @@ function loadDate(date) {
       renderVolume(data.volume, data.stats.date);
       document.getElementById('loading').style.display = 'none';
       document.getElementById('charts-grid').style.display = 'grid';
+
+      // Fetch previous day data for 前日比
+      const prevDate = allDates[allDates.indexOf(date) + 1];
+      const diffEl = document.getElementById('stat-diff');
+      if (prevDate) {
+        fetch(`data/${prevDate}.json`)
+          .then(r => r.json())
+          .then(prev => {
+            const diff = Math.round(data.stats.spot - prev.stats.spot);
+            const pct = ((data.stats.spot - prev.stats.spot) / prev.stats.spot * 100).toFixed(1);
+            diffEl.textContent = (diff >= 0 ? '+' : '') + diff.toLocaleString() +
+              ' (' + (diff >= 0 ? '+' : '') + pct + '%)';
+            diffEl.className = 'stat-value ' + (diff >= 0 ? 'up' : 'down');
+          })
+          .catch(() => { diffEl.textContent = '—'; diffEl.className = 'stat-value'; });
+      } else {
+        diffEl.textContent = '—'; diffEl.className = 'stat-value';
+      }
     })
     .catch(e => {
       document.getElementById('loading').textContent = '読み込みエラー: ' + e.message;
@@ -335,6 +426,11 @@ function renderStats(s) {
   flip.textContent = '¥' + Math.round(s.gex_flip).toLocaleString();
   flip.className = 'stat-value ' + (s.spot >= s.gex_flip ? 'up' : 'down');
 
+  const flipDiff = Math.round(s.spot - s.gex_flip);
+  const flipDist = document.getElementById('stat-flip-dist');
+  flipDist.textContent = (flipDiff >= 0 ? '+' : '') + flipDiff.toLocaleString() + '円';
+  flipDist.className = 'stat-value ' + (flipDiff >= 0 ? 'up' : 'down');
+
   document.getElementById('stat-call-oi').textContent = s.total_call_oi.toLocaleString() + '枚';
   document.getElementById('stat-put-oi').textContent  = s.total_put_oi.toLocaleString()  + '枚';
 }
@@ -355,7 +451,7 @@ const EXP_COLORS = {
 // ── OI Profile ────────────────────────────────────────────────────────────────
 function renderOI(data, dateLabel) {
   const wrap = clearWrap('wrap-oi');
-  const W = 880, H = 720;
+  const W = 880, H = 900;
   const margin = { top: 60, right: 160, bottom: 44, left: 100 };
   const innerW = W - margin.left - margin.right;
   const innerH = H - margin.top - margin.bottom;
@@ -705,7 +801,6 @@ function renderIV(data, dateLabel) {
   // Build series list and auto-detect x range from valid data
   const series = [];
   const allValidStrikes = [];
-  let allIVs = [];
 
   for (let i = 0; i < exps.length; i++) {
     const exp = exps[i];
@@ -718,7 +813,7 @@ function renderIV(data, dateLabel) {
         .filter(d => ivValid(d.iv))
         .sort((a, b) => a.s - b.s);
       if (pts.length < 2) continue;
-      pts.forEach(p => { allValidStrikes.push(p.s); allIVs.push(p.iv); });
+      pts.forEach(p => { allValidStrikes.push(p.s); });
       series.push({ exp, side, color, expLabel, pts, id: `iv-${i}-${side}` });
     }
   }
@@ -730,9 +825,11 @@ function renderIV(data, dateLabel) {
   const sMin = Math.floor(rawMin / 1000) * 1000;
   const sMax = Math.ceil(rawMax  / 1000) * 1000;
 
-  // Clamp series pts to range
+  // Clamp series pts to range, then derive IV extent from clamped data
   series.forEach(s => { s.pts = s.pts.filter(p => p.s >= sMin && p.s <= sMax); });
 
+  let allIVs = [];
+  series.forEach(s => s.pts.forEach(p => allIVs.push(p.iv)));
   if (allIVs.length === 0) allIVs = [15, 45];
   const ivMin = Math.max(0, d3.min(allIVs) - 2);
   const ivMax = Math.min(100, d3.max(allIVs) + 4);
@@ -938,13 +1035,12 @@ function renderVolume(data, dateLabel) {
       .attr('stroke', '#21262d').attr('stroke-width', 0.5).attr('opacity', 0.5);
   }
 
-  // Stacked bars with tooltip
+  // Stacked bars — first pass (drawn below hit areas)
   for (const s of volStrikes) {
     const sk = String(s);
     const cv = data.call_vol[sk] || 0;
     const pv = data.put_vol[sk] || 0;
-    const tot = cv + pv;
-    if (tot === 0) continue;
+    if (cv + pv === 0) continue;
     const x  = xScale(s);
     const bw = xScale.bandwidth();
 
@@ -960,11 +1056,20 @@ function renderVolume(data, dateLabel) {
         .attr('height', yScale(pv) - yScale(pv + cv))
         .attr('fill', '#4CAF50').attr('opacity', 0.8);
     }
+  }
 
-    // Invisible overlay for tooltip
-    g.append('rect').attr('x', x).attr('y', yScale(tot)).attr('width', bw)
-      .attr('height', innerH - yScale(tot))
-      .attr('fill', 'transparent')
+  // Full-column invisible hit areas — second pass (on top for reliable hover)
+  for (const s of volStrikes) {
+    const sk = String(s);
+    const cv = data.call_vol[sk] || 0;
+    const pv = data.put_vol[sk] || 0;
+    const tot = cv + pv;
+    if (tot === 0) continue;
+    const x  = xScale(s);
+    const bw = xScale.bandwidth();
+
+    g.append('rect').attr('x', x).attr('y', 0).attr('width', bw).attr('height', innerH)
+      .attr('fill', 'transparent').style('pointer-events', 'all')
       .on('mouseover', (ev) => showTip(ev,
         `<b>¥${s.toLocaleString()}</b><br>` +
         `コール出来高: <span style="color:#4CAF50">${Math.round(cv).toLocaleString()}枚</span><br>` +
@@ -1032,6 +1137,55 @@ function renderVolume(data, dateLabel) {
     .attr('text-anchor', 'middle').attr('fill', '#c9d1d9').attr('font-size', '14px').attr('font-weight', 'bold')
     .text(`NK225 ¥${Math.round(data.spot).toLocaleString()} — 出来高分布 — ${dateLabel}`);
 }
+
+// ── Calendar ──────────────────────────────────────────────────────────────────
+function openCalendar() {
+  renderCalendar();
+  document.getElementById('cal-modal').style.display = 'flex';
+}
+function closeCalendar() {
+  document.getElementById('cal-modal').style.display = 'none';
+}
+function renderCalendar() {
+  const DOW = ['月', '火', '水', '木', '金', '土', '日'];
+  const byMonth = {};
+  for (const d of allDates) {
+    const ym = d.slice(0, 7);
+    if (!byMonth[ym]) byMonth[ym] = new Set();
+    byMonth[ym].add(+d.slice(8, 10));
+  }
+  const currentStr = allDates[currentIndex];
+
+  let html = '';
+  for (const ym of Object.keys(byMonth).sort()) {
+    const [y, m] = ym.split('-');
+    const monthLabel = `${y}年${+m}月`;
+    const firstDow = new Date(+y, +m - 1, 1).getDay(); // 0=Sun
+    const offset = firstDow === 0 ? 6 : firstDow - 1;  // Mon-first grid
+    const daysInMonth = new Date(+y, +m, 0).getDate();
+    const avail = byMonth[ym];
+
+    html += `<div><div class="cal-month-title">${monthLabel}</div><div class="cal-grid">`;
+    for (const d of DOW) html += `<div class="cal-dow">${d}</div>`;
+    for (let i = 0; i < offset; i++) html += `<div class="cal-day"></div>`;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const full = `${y}-${m}-${String(d).padStart(2, '0')}`;
+      const isAvail = avail.has(d);
+      const isCurrent = full === currentStr;
+      const cls = 'cal-day' + (isAvail ? ' avail' : '') + (isCurrent ? ' current' : '');
+      const click = isAvail ? `onclick="loadDate('${full}');closeCalendar()"` : '';
+      html += `<div class="${cls}" ${click}>${d}</div>`;
+    }
+    html += `</div></div>`;
+  }
+  document.getElementById('cal-body').innerHTML = html;
+}
 </script>
+<div id="cal-modal" onclick="if(event.target===this)closeCalendar()">
+  <div class="cal-container">
+    <button class="cal-close" onclick="closeCalendar()">&#x2715;</button>
+    <div id="cal-body" style="display:flex;gap:28px;flex-wrap:wrap;"></div>
+  </div>
+</div>
 </body>
 </html>
