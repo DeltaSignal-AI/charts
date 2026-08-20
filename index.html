@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DeltaSignal — NK225 Options Analysis</title>
+  <script src="d3.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0d1117;
+      color: #c9d1d9;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans JP', sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: #161b22;
+      border-bottom: 1px solid #21262d;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .logo {
+      font-size: 18px;
+      font-weight: 700;
+      color: #c9d1d9;
+      letter-spacing: 0.02em;
+    }
+    .logo span { color: #4CAF50; }
+    .header-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .date-label-small {
+      font-size: 13px;
+      color: #8b949e;
+    }
+
+    /* ── Date selector ── */
+    .controls {
+      background: #161b22;
+      border-bottom: 1px solid #21262d;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .controls label {
+      font-size: 13px;
+      color: #8b949e;
+    }
+    select#date-picker {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 14px;
+      cursor: pointer;
+      outline: none;
+      min-width: 140px;
+    }
+    select#date-picker:focus { border-color: #4CAF50; }
+
+    .nav-btn {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .nav-btn:hover { background: #30363d; }
+    .nav-btn:disabled { opacity: 0.35; cursor: default; }
+
+    /* ── Stats bar ── */
+    .stats-bar {
+      display: flex;
+      gap: 24px;
+      padding: 12px 24px;
+      background: #0d1117;
+      border-bottom: 1px solid #21262d;
+      flex-wrap: wrap;
+    }
+    .stat-item { display: flex; flex-direction: column; gap: 2px; }
+    .stat-label { font-size: 11px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat-value { font-size: 16px; font-weight: 600; color: #c9d1d9; }
+    .stat-value.up   { color: #4CAF50; }
+    .stat-value.down { color: #f44336; }
+    .stat-value.warn { color: #ffd740; }
+
+    /* ── Charts grid ── */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(640px, 1fr));
+      gap: 1px;
+      background: #21262d;
+    }
+    .chart-panel {
+      background: #0d1117;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .chart-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .chart-wrap { width: 100%; overflow: hidden; }
+    .chart-wrap svg { display: block; width: 100%; }
+
+    /* ── Footer ── */
+    footer {
+      padding: 20px 24px;
+      font-size: 11px;
+      color: #484f58;
+      border-top: 1px solid #21262d;
+      line-height: 1.8;
+    }
+    footer a { color: #58a6ff; text-decoration: none; }
+
+    /* ── Loading ── */
+    #loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 300px;
+      font-size: 14px;
+      color: #8b949e;
+    }
+    .spinner {
+      width: 20px; height: 20px;
+      border: 2px solid #30363d;
+      border-top-color: #4CAF50;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 10px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Delta<span>Signal</span></div>
+  <div style="font-size:13px;color:#8b949e;">NK225 Options Analysis</div>
+  <div class="header-right">
+    <a href="https://note.com/deltasignal_ai" target="_blank"
+       style="font-size:12px;color:#58a6ff;text-decoration:none;">note.com →</a>
+  </div>
+</header>
+
+<div class="controls">
+  <label for="date-picker">データ日付</label>
+  <button class="nav-btn" id="btn-prev" onclick="navigateDate(-1)">◀ 前日</button>
+  <select id="date-picker" onchange="loadDate(this.value)"></select>
+  <button class="nav-btn" id="btn-next" onclick="navigateDate(1)">翌日 ▶</button>
+</div>
+
+<div class="stats-bar" id="stats-bar">
+  <div class="stat-item">
+    <span class="stat-label">日経225先物</span>
+    <span class="stat-value" id="stat-spot">—</span>
+  </div>
+  <div class="stat-item">
+    <span class="stat-label">PCR（全限月）</span>
+    <span class="stat-value" id="stat-pcr">—</span>
+  </div>
+  <div class="stat-item">
+    <span class="stat-label">ATM IV（コール）</span>
+    <span class="stat-value" id="stat-call-iv">—</span>
+  </div>
+  <div class="stat-item">
+    <span class="stat-label">ATM IV（プット）</span>
+    <span class="stat-value" id="stat-put-iv">—</span>
+  </div>
+  <div class="stat-item">
+    <span class="stat-label">GEX フリップ</span>
+    <span class="stat-value" id="stat-flip">—</span>
+  </div>
+  <div class="stat-item">
+    <span class="stat-label">コールOI</span>
+    <span class="stat-value" id="stat-call-oi">—</span>
+  </div>
+  <div class="stat-item">
+    <span class="stat-label">プットOI</span>
+    <span class="stat-value" id="stat-put-oi">—</span>
+  </div>
+</div>
+
+<div id="loading"><div class="spinner"></div>データを読み込み中…</div>
+
+<div class="charts-grid" id="charts-grid" style="display:none">
+  <div class="chart-panel">
+    <div class="chart-title">OI プロファイル（建玉分布）</div>
+    <div class="chart-wrap" id="wrap-oi"></div>
+  </div>
+  <div class="chart-panel">
+    <div class="chart-title">GEX プロファイル（ガンマ Exposure 推定）</div>
+    <div class="chart-wrap" id="wrap-gex"></div>
+  </div>
+  <div class="chart-panel">
+    <div class="chart-title">IV スマイルカーブ</div>
+    <div class="chart-wrap" id="wrap-iv"></div>
+  </div>
+  <div class="chart-panel">
+    <div class="chart-title">出来高分布</div>
+    <div class="chart-wrap" id="wrap-vol"></div>
+  </div>
+</div>
+
+<footer>
+  データソース: JPX（日本取引所グループ）日次決済データ。GEXはBlack-Scholesガンマを用いた推定値であり、
+  実際の市場参加者のポジションとは異なる場合があります。本サイトは情報提供を目的としており、
+  投資勧誘・売買推奨を意図するものではありません。<br>
+  © DeltaSignal · <a href="https://note.com/deltasignal_ai" target="_blank">note.com</a> ·
+  <a href="https://deltasignalz.substack.com/" target="_blank">Substack</a>
+</footer>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+let allDates = [];
+let currentIndex = 0;
+let currentData = null;
+
+// ── Boot ─────────────────────────────────────────────────────────────────────
+fetch('data/dates.json')
+  .then(r => r.json())
+  .then(dates => {
+    allDates = dates; // newest first
+    const sel = document.getElementById('date-picker');
+    dates.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d;
+      opt.textContent = d;
+      sel.appendChild(opt);
+    });
+    loadDate(dates[0]);
+  })
+  .catch(e => {
+    document.getElementById('loading').textContent = 'データの読み込みに失敗しました: ' + e.message;
+  });
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function navigateDate(dir) {
+  const newIdx = currentIndex + dir;
+  if (newIdx < 0 || newIdx >= allDates.length) return;
+  loadDate(allDates[newIdx]);
+}
+
+function loadDate(date) {
+  currentIndex = allDates.indexOf(date);
+  document.getElementById('date-picker').value = date;
+  document.getElementById('btn-prev').disabled = currentIndex >= allDates.length - 1;
+  document.getElementById('btn-next').disabled = currentIndex <= 0;
+
+  document.getElementById('loading').style.display = 'flex';
+  document.getElementById('charts-grid').style.display = 'none';
+
+  fetch(`data/${date}.json`)
+    .then(r => r.json())
+    .then(data => {
+      currentData = data;
+      renderStats(data.stats);
+      renderOI(data.oi_profile, data.stats.date);
+      renderGEX(data.gex, data.stats.date);
+      renderIV(data.iv_smile, data.stats.date);
+      renderVolume(data.volume, data.stats.date);
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('charts-grid').style.display = 'grid';
+    })
+    .catch(e => {
+      document.getElementById('loading').textContent = '読み込みエラー: ' + e.message;
+    });
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+function renderStats(s) {
+  const spot = document.getElementById('stat-spot');
+  spot.textContent = '¥' + s.spot.toLocaleString();
+
+  const pcr = document.getElementById('stat-pcr');
+  pcr.textContent = s.pcr.toFixed(2);
+  pcr.className = 'stat-value ' + (s.pcr >= 1.5 ? 'down' : s.pcr >= 1.0 ? 'warn' : '');
+
+  const callIv = document.getElementById('stat-call-iv');
+  callIv.textContent = s.atm_call_iv != null ? s.atm_call_iv.toFixed(1) + '%' : '—';
+
+  const putIv = document.getElementById('stat-put-iv');
+  putIv.textContent = s.atm_put_iv != null ? s.atm_put_iv.toFixed(1) + '%' : '—';
+
+  const flip = document.getElementById('stat-flip');
+  flip.textContent = '¥' + Math.round(s.gex_flip).toLocaleString();
+  const abovFlip = s.spot >= s.gex_flip;
+  flip.className = 'stat-value ' + (abovFlip ? 'up' : 'down');
+
+  document.getElementById('stat-call-oi').textContent = s.total_call_oi.toLocaleString() + '枚';
+  document.getElementById('stat-put-oi').textContent  = s.total_put_oi.toLocaleString() + '枚';
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function clearWrap(id) {
+  const el = document.getElementById(id);
+  el.innerHTML = '';
+  return el;
+}
+
+const EXP_COLORS = {
+  // front 3 slots — picked dynamically based on position in expirations array
+  0: { call: '#4CAF50', put: '#f44336' },
+  1: { call: '#81C784', put: '#e57373' },
+  2: { call: '#A5D6A7', put: '#ef9a9a' },
+};
+
+// ── OI Profile ────────────────────────────────────────────────────────────────
+function renderOI(data, dateLabel) {
+  const wrap = clearWrap('wrap-oi');
+  const W = 800, H = 640;
+  const margin = { top: 50, right: 120, bottom: 40, left: 100 };
+  const innerW = W - margin.left - margin.right;
+  const innerH = H - margin.top - margin.bottom;
+
+  const svg = d3.select(wrap).append('svg')
+    .attr('viewBox', `0 0 ${W} ${H}`)
+    .attr('preserveAspectRatio', 'xMidYMid meet')
+    .style('background', '#0d1117');
+
+  svg.append('rect').attr('x', margin.left).attr('y', margin.top)
+    .attr('width', innerW).attr('height', innerH).attr('fill', '#161b22');
+
+  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+  const allStrikes = data.strikes.filter(s => s % 250 === 0);
+  const exps = data.expirations;
+
+  let maxOI = 1;
+  for (const s of allStrikes) {
+    const sk = String(s);
+    for (let i = 0; i < exps.length; i++) {
+      const exp = exps[i];
+      const c = (data.call_oi[exp] || {})[sk] || 0;
+      const p = (data.put_oi[exp] || {})[sk] || 0;
+      if (c > maxOI) maxOI = c;
+      if (p > maxOI) maxOI = p;
+    }
+  }
+
+  const yScale = d3.scaleBand()
+    .domain([...allStrikes].reverse())
+    .range([0, innerH])
+    .padding(0.18);
+
+  const halfW = innerW / 2;
+  const cx = halfW;
+  const xScale = d3.scaleLinear().domain([0, maxOI * 1.12]).range([0, halfW]);
+
+  // Grid
+  for (const v of xScale.ticks(4)) {
+    if (v === 0) continue;
+    for (const dir of [1, -1]) {
+      g.append('line')
+        .attr('x1', cx + dir * xScale(v)).attr('x2', cx + dir * xScale(v))
+        .attr('y1', 0).attr('y2', innerH)
+        .attr('stroke', '#21262d').attr('stroke-width', 0.5).attr('opacity', 0.6);
+    }
+  }
+  g.append('line').attr('x1', cx).attr('x2', cx).attr('y1', 0).attr('y2', innerH)
+    .attr('stroke', '#30363d').attr('stroke-width', 1);
+
+  // Bars
+  for (const s of allStrikes) {
+    const sk = String(s);
+    let callOff = 0, putOff = 0;
+    for (let i = 0; i < exps.length; i++) {
+      const exp = exps[i];
+      const col = EXP_COLORS[i] || EXP_COLORS[0];
+      const coi = (data.call_oi[exp] || {})[sk] || 0;
+      const poi = (data.put_oi[exp] || {})[sk] || 0;
+      const y = yScale(s);
+      const bh = yScale.bandwidth();
+
+      if (coi > 0) {
+        g.append('rect').attr('x', cx + xScale(callOff)).attr('y', y)
+          .attr('width', xScale(coi)).attr('height', bh)
+          .attr('fill', col.call).attr('opacity', 0.88);
+        callOff += coi;
+      }
+      if (poi > 0) {
+        g.append('rect').attr('x', cx - xScale(putOff) - xScale(poi)).attr('y', y)
+          .attr('width', xScale(poi)).attr('height', bh)
+          .attr('fill', col.put).attr('opacity', 0.88);
+        putOff += poi;
+      }
+    }
+  }
+
+  // Spot line
+  const spotS = allStrikes.reduce((p, c) => Math.abs(c - data.spot) < Math.abs(p - data.spot) ? c : p);
+  const sy = yScale(spotS);
+  if (sy !== undefined) {
+    g.append('line').attr('x1', 0).attr('x2', innerW)
+      .attr('y1', sy + yScale.bandwidth() / 2).attr('y2', sy + yScale.bandwidth() / 2)
+      .attr('stroke', '#ffd740').attr('stroke-width', 1.5).attr('stroke-dasharray', '6 3');
+    g.append('text').attr('x', innerW + 6).attr('y', sy + yScale.bandwidth() / 2 + 4)
+      .attr('fill', '#ffd740').attr('font-size', '10px').attr('font-weight', 'bold')
+      .text('¥' + data.spot.toLocaleString());
+  }
+
+  // Top3 labels
+  for (const { strike, oi } of data.top3_call) {
+    const nearS = allStrikes.reduce((p, c) => Math.abs(c - strike) < Math.abs(p - strike) ? c : p);
+    if (Math.abs(nearS - strike) > 300) continue;
+    const sk = String(nearS);
+    let tot = 0;
+    for (const exp of exps) tot += (data.call_oi[exp] || {})[sk] || 0;
+    if (tot === 0) continue;
+    const y = yScale(nearS);
+    g.append('text').attr('x', cx + xScale(tot) + 5).attr('y', y + yScale.bandwidth() / 2 + 4)
+      .attr('fill', '#4CAF50').attr('font-size', '9px').attr('font-weight', 'bold')
+      .text(Math.round(tot).toLocaleString());
+  }
+  for (const { strike, oi } of data.top3_put) {
+    const nearS = allStrikes.reduce((p, c) => Math.abs(c - strike) < Math.abs(p - strike) ? c : p);
+    if (Math.abs(nearS - strike) > 300) continue;
+    const sk = String(nearS);
+    let tot = 0;
+    for (const exp of exps) tot += (data.put_oi[exp] || {})[sk] || 0;
+    if (tot === 0) continue;
+    const y = yScale(nearS);
+    g.append('text').attr('x', cx - xScale(tot) - 5).attr('y', y + yScale.bandwidth() / 2 + 4)
+      .attr('text-anchor', 'end').attr('fill', '#f44336').attr('font-size', '9px').attr('font-weight', 'bold')
+      .text(Math.round(tot).toLocaleString());
+  }
+
+  // Y axis
+  const yTicks = allStrikes.filter(s => s % 1000 === 0);
+  const yAxisG = g.append('g').call(
+    d3.axisLeft(yScale).tickValues(yTicks).tickFormat(d => '¥' + (+d).toLocaleString())
+  );
+  yAxisG.selectAll('text').attr('fill', '#c9d1d9').attr('font-size', '10px');
+  yAxisG.selectAll('.domain').attr('stroke', '#30363d');
+  yAxisG.selectAll('.tick line').attr('stroke', '#30363d');
+
+  // X axis labels
+  for (const v of xScale.ticks(4)) {
+    if (v === 0) continue;
+    const label = v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v);
+    for (const dir of [1, -1]) {
+      g.append('text').attr('x', cx + dir * xScale(v)).attr('y', innerH + 18)
+        .attr('text-anchor', 'middle').attr('fill', '#8b949e').attr('font-size', '9px').text(label);
+    }
+  }
+
+  // Headers
+  g.append('text').attr('x', cx + innerW * 0.14).attr('y', -12)
+    .attr('text-anchor', 'middle').attr('fill', '#4CAF50').attr('font-size', '12px').attr('font-weight', 'bold')
+    .text('コール →');
+  g.append('text').attr('x', cx - innerW * 0.14).attr('y', -12)
+    .attr('text-anchor', 'middle').attr('fill', '#f44336').attr('font-size', '12px').attr('font-weight', 'bold')
+    .text('← プット');
+
+  // Legend
+  const legX = innerW - 120, legY = 0;
+  for (let i = 0; i < exps.length; i++) {
+    const exp = exps[i];
+    const col = EXP_COLORS[i] || EXP_COLORS[0];
+    const label = (data.expiry_labels || {})[exp] || exp;
+    const ly = legY + i * 20;
+    g.append('rect').attr('x', legX).attr('y', ly).attr('width', 10).attr('height', 10).attr('fill', col.call).attr('opacity', 0.88);
+    g.append('rect').attr('x', legX + 14).attr('y', ly).attr('width', 10).attr('height', 10).attr('fill', col.put).attr('opacity', 0.88);
+    g.append('text').attr('x', legX + 28).attr('y', ly + 9)
+      .attr('fill', '#c9d1d9').attr('font-size', '10px').text(label);
+  }
+
+  // Title
+  svg.append('text').attr('x', W / 2).attr('y', 32)
+    .attr('text-anchor', 'middle').attr('fill', '#c9d1d9').attr('font-size', '13px').attr('font-weight', 'bold')
+    .text(`NK225 ¥${data.spot.toLocaleString()} — OI プロファイル — ${dateLabel}`);
+}
+
+// ── GEX ──────────────────────────────────────────────────────────────────────
+function renderGEX(data, dateLabel) {
+  const wrap = clearWrap('wrap-gex');
+  const W = 800, H = 480;
+  const margin = { top: 50, right: 30, bottom: 55, left: 75 };
+  const innerW = W - margin.left - margin.right;
+  const innerH = H - margin.top - margin.bottom;
+
+  const svg = d3.select(wrap).append('svg')
+    .attr('viewBox', `0 0 ${W} ${H}`)
+    .attr('preserveAspectRatio', 'xMidYMid meet')
+    .style('background', '#0d1117');
+
+  svg.append('rect').attr('x', margin.left).attr('y', margin.top)
+    .attr('width', innerW).attr('height', innerH).attr('fill', '#161b22');
+
+  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+  const gexEntries = Object.entries(data.gex_by_strike)
+    .map(([k, v]) => ({ strike: +k, gex: v }))
+    .filter(d => d.strike >= 60000 && d.strike <= 82000)
+    .sort((a, b) => a.strike - b.strike);
+
+  const strikes = gexEntries.map(d => d.strike);
+  const maxAbsGex = Math.max(...gexEntries.map(d => Math.abs(d.gex)), 0.001);
+
+  const xScale = d3.scaleBand().domain(strikes).range([0, innerW]).padding(0.1);
+  const yScale = d3.scaleLinear()
+    .domain([-maxAbsGex * 1.15, maxAbsGex * 1.15])
+    .range([innerH, 0]);
+
+  // Grid
+  for (const v of yScale.ticks(6)) {
+    g.append('line').attr('x1', 0).attr('x2', innerW)
+      .attr('y1', yScale(v)).attr('y2', yScale(v))
+      .attr('stroke', '#21262d').attr('stroke-width', 0.5).attr('opacity', 0.5);
+  }
+  g.append('line').attr('x1', 0).attr('x2', innerW)
+    .attr('y1', yScale(0)).attr('y2', yScale(0))
+    .attr('stroke', '#8b949e').attr('stroke-width', 1);
+
+  // Bars
+  for (const d of gexEntries) {
+    g.append('rect')
+      .attr('x', xScale(d.strike))
+      .attr('width', xScale.bandwidth())
+      .attr('y', d.gex >= 0 ? yScale(d.gex) : yScale(0))
+      .attr('height', Math.abs(yScale(d.gex) - yScale(0)))
+      .attr('fill', d.gex >= 0 ? '#4CAF50' : '#f44336')
+      .attr('opacity', 0.85);
+  }
+
+  // Spot line
+  if (strikes.length) {
+    const nearSpot = strikes.reduce((p, c) => Math.abs(c - data.spot) < Math.abs(p - data.spot) ? c : p);
+    const sx = xScale(nearSpot) + xScale.bandwidth() / 2;
+    g.append('line').attr('x1', sx).attr('x2', sx).attr('y1', 0).attr('y2', innerH)
+      .attr('stroke', '#ffd740').attr('stroke-width', 2).attr('stroke-dasharray', '6 3');
+    g.append('text').attr('x', sx + 5).attr('y', 14)
+      .attr('fill', '#ffd740').attr('font-size', '10px').attr('font-weight', 'bold')
+      .text('SPOT ¥' + data.spot.toLocaleString());
+  }
+
+  // Flip line
+  const fp = data.flip_point;
+  if (strikes.length) {
+    const nearFlip = strikes.reduce((p, c) => Math.abs(c - fp) < Math.abs(p - fp) ? c : p);
+    if (Math.abs(nearFlip - fp) < 1000) {
+      const fx = xScale(nearFlip) + xScale.bandwidth() / 2;
+      g.append('line').attr('x1', fx).attr('x2', fx).attr('y1', 0).attr('y2', innerH)
+        .attr('stroke', '#bb86fc').attr('stroke-width', 1.5).attr('stroke-dasharray', '4 2');
+      g.append('text').attr('x', fx + 5).attr('y', 28)
+        .attr('fill', '#bb86fc').attr('font-size', '10px').attr('font-weight', 'bold')
+        .text('FLIP ¥' + Math.round(fp).toLocaleString());
+    }
+  }
+
+  // X axis (every 2000)
+  const xTicks = strikes.filter(s => s % 2000 === 0);
+  const xAxisG = g.append('g').attr('transform', `translate(0,${innerH})`).call(
+    d3.axisBottom(xScale).tickValues(xTicks).tickFormat(d => '¥' + (+d / 1000).toFixed(0) + 'k')
+  );
+  xAxisG.selectAll('text').attr('fill', '#c9d1d9').attr('font-size', '10px');
+  xAxisG.selectAll('.domain').attr('stroke', '#30363d');
+  xAxisG.selectAll('.tick line').attr('stroke', '#30363d');
+
+  // Y axis
+  const yAxisG = g.append('g').call(
+    d3.axisLeft(yScale).ticks(6).tickFormat(d => {
+      const a = Math.abs(d);
+      return a >= 1000 ? (d / 1000).toFixed(1) + 'k' : d.toFixed(2);
+    })
+  );
+  yAxisG.selectAll('text').attr('fill', '#8b949e').attr('font-size', '10px');
+  yAxisG.selectAll('.domain').attr('stroke', '#30363d');
+  yAxisG.selectAll('.tick line').attr('stroke', '#30363d');
+
+  // Zone labels
+  g.append('text').attr('x', 8).attr('y', yScale(maxAbsGex * 0.8))
+    .attr('fill', '#4CAF50').attr('font-size', '10px').attr('opacity', 0.85)
+    .text('▲ ポジティブGEX（安定）');
+  g.append('text').attr('x', 8).attr('y', yScale(-maxAbsGex * 0.8))
+    .attr('fill', '#f44336').attr('font-size', '10px').attr('opacity', 0.85)
+    .text('▼ ネガティブGEX（加速）');
+
+  // Y label
+  svg.append('text').attr('transform', 'rotate(-90)')
+    .attr('x', -(margin.top + innerH / 2)).attr('y', 16)
+    .attr('text-anchor', 'middle').attr('fill', '#8b949e').attr('font-size', '10px')
+    .text('GEX（推定）');
+
+  // Title
+  svg.append('text').attr('x', W / 2).attr('y', 30)
+    .attr('text-anchor', 'middle').attr('fill', '#c9d1d9').attr('font-size', '13px').attr('font-weight', 'bold')
+    .text(`NK225 ¥${data.spot.toLocaleString()} — GEX — ${dateLabel}`);
+}
+
+// ── IV Smile ─────────────────────────────────────────────────────────────────
+function renderIV(data, dateLabel) {
+  const wrap = clearWrap('wrap-iv');
+  const W = 800, H = 480;
+  const margin = { top: 50, right: 140, bottom: 55, left: 70 };
+  const innerW = W - margin.left - margin.right;
+  const innerH = H - margin.top - margin.bottom;
+
+  const svg = d3.select(wrap).append('svg')
+    .attr('viewBox', `0 0 ${W} ${H}`)
+    .attr('preserveAspectRatio', 'xMidYMid meet')
+    .style('background', '#0d1117');
+
+  svg.append('rect').attr('x', margin.left).attr('y', margin.top)
+    .attr('width', innerW).attr('height', innerH).attr('fill', '#161b22');
+
+  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+  const exps = data.expirations;
+  const spot = data.spot;
+  const sMin = 62000, sMax = 80000;
+  const ivValid = v => v > 8 && v < 100;
+
+  // Color per expiry slot
+  const EXP_LINE_COLORS = ['#FFD54F', '#4FC3F7', '#AB47BC'];
+
+  // Collect all valid IVs for scale
+  let allIVs = [];
+  for (let i = 0; i < exps.length; i++) {
+    const exp = exps[i];
+    for (const [k, v] of Object.entries(data.call_iv[exp] || {})) {
+      if (+k >= sMin && +k <= sMax && ivValid(v)) allIVs.push(v);
+    }
+    for (const [k, v] of Object.entries(data.put_iv[exp] || {})) {
+      if (+k >= sMin && +k <= sMax && ivValid(v)) allIVs.push(v);
+    }
+  }
+  if (allIVs.length === 0) allIVs = [15, 45];
+  const ivMin = Math.max(0, d3.min(allIVs) - 2);
+  const ivMax = Math.min(100, d3.max(allIVs) + 2);
+
+  const xScale = d3.scaleLinear().domain([sMin, sMax]).range([0, innerW]);
+  const yScale = d3.scaleLinear().domain([ivMin, ivMax]).range([innerH, 0]);
+
+  // Grid
+  for (const v of yScale.ticks(6)) {
+    g.append('line').attr('x1', 0).attr('x2', innerW)
+      .attr('y1', yScale(v)).attr('y2', yScale(v))
+      .attr('stroke', '#21262d').attr('stroke-width', 0.5).attr('opacity', 0.5);
+  }
+  for (const v of xScale.ticks(8)) {
+    g.append('line').attr('x1', xScale(v)).attr('x2', xScale(v))
+      .attr('y1', 0).attr('y2', innerH)
+      .attr('stroke', '#21262d').attr('stroke-width', 0.5).attr('opacity', 0.3);
+  }
+
+  // Spot line
+  g.append('line').attr('x1', xScale(spot)).attr('x2', xScale(spot))
+    .attr('y1', 0).attr('y2', innerH)
+    .attr('stroke', '#ffd740').attr('stroke-width', 2).attr('stroke-dasharray', '6 3');
+  g.append('text').attr('x', xScale(spot) + 5).attr('y', 14)
+    .attr('fill', '#ffd740').attr('font-size', '10px').attr('font-weight', 'bold')
+    .text('¥' + spot.toLocaleString());
+
+  const lineGen = d3.line()
+    .x(d => xScale(d.s))
+    .y(d => yScale(d.iv))
+    .curve(d3.curveMonotoneX);
+
+  // Draw lines
+  for (let i = 0; i < exps.length; i++) {
+    const exp = exps[i];
+    const color = EXP_LINE_COLORS[i] || '#ccc';
+    const label = (data.expiry_labels || {})[exp] || exp;
+
+    for (const [side, dict] of [['call', data.call_iv[exp] || {}], ['put', data.put_iv[exp] || {}]]) {
+      const pts = Object.entries(dict)
+        .map(([k, v]) => ({ s: +k, iv: v }))
+        .filter(d => d.s >= sMin && d.s <= sMax && ivValid(d.iv))
+        .sort((a, b) => a.s - b.s);
+
+      if (pts.length < 2) continue;
+
+      g.append('path')
+        .datum(pts)
+        .attr('fill', 'none')
+        .attr('stroke', color)
+        .attr('stroke-width', side === 'call' ? 2 : 1.5)
+        .attr('stroke-dasharray', side === 'put' ? '5 3' : 'none')
+        .attr('opacity', 0.9)
+        .attr('d', lineGen);
+
+      g.selectAll(null).data(pts.filter((_, j) => j % 3 === 0))
+        .enter().append('circle')
+        .attr('cx', d => xScale(d.s))
+        .attr('cy', d => yScale(d.iv))
+        .attr('r', 2.5)
+        .attr('fill', color)
+        .attr('opacity', 0.7);
+    }
+  }
+
+  // X axis
+  const xAxisG = g.append('g').attr('transform', `translate(0,${innerH})`).call(
+    d3.axisBottom(xScale).ticks(8).tickFormat(d => '¥' + (+d / 1000).toFixed(0) + 'k')
+  );
+  xAxisG.selectAll('text').attr('fill', '#c9d1d9').attr('font-size', '10px');
+  xAxisG.selectAll('.domain').attr('stroke', '#30363d');
+  xAxisG.selectAll('.tick line').attr('stroke', '#30363d');
+
+  // Y axis
+  const yAxisG = g.append('g').call(
+    d3.axisLeft(yScale).ticks(6).tickFormat(d => d.toFixed(0) + '%')
+  );
+  yAxisG.selectAll('text').attr('fill', '#8b949e').attr('font-size', '10px');
+  yAxisG.selectAll('.domain').attr('stroke', '#30363d');
+  yAxisG.selectAll('.tick line').attr('stroke', '#30363d');
+
+  // Y label
+  svg.append('text').attr('transform', 'rotate(-90)')
+    .attr('x', -(margin.top + innerH / 2)).attr('y', 16)
+    .attr('text-anchor', 'middle').attr('fill', '#8b949e').attr('font-size', '10px')
+    .text('Implied Volatility (%)');
+
+  // Legend
+  const legX = innerW + 15;
+  for (let i = 0; i < exps.length; i++) {
+    const exp = exps[i];
+    const color = EXP_LINE_COLORS[i] || '#ccc';
+    const label = (data.expiry_labels || {})[exp] || exp;
+    const ly = i * 40;
+
+    g.append('line').attr('x1', legX).attr('x2', legX + 22)
+      .attr('y1', ly + 8).attr('y2', ly + 8)
+      .attr('stroke', color).attr('stroke-width', 2);
+    g.append('text').attr('x', legX).attr('y', ly + 4)
+      .attr('fill', color).attr('font-size', '10px').attr('font-weight', 'bold')
+      .text(label);
+    g.append('text').attr('x', legX).attr('y', ly + 18)
+      .attr('fill', '#8b949e').attr('font-size', '9px').text('— コール');
+    g.append('text').attr('x', legX).attr('y', ly + 30)
+      .attr('fill', '#8b949e').attr('font-size', '9px').text('- - プット');
+  }
+
+  // Title
+  svg.append('text').attr('x', W / 2).attr('y', 30)
+    .attr('text-anchor', 'middle').attr('fill', '#c9d1d9').attr('font-size', '13px').attr('font-weight', 'bold')
+    .text(`NK225 ¥${spot.toLocaleString()} — IV スマイル — ${dateLabel}`);
+}
+
+// ── Volume ────────────────────────────────────────────────────────────────────
+function renderVolume(data, dateLabel) {
+  const wrap = clearWrap('wrap-vol');
+  const W = 800, H = 480;
+  const margin = { top: 50, right: 30, bottom: 60, left: 75 };
+  const innerW = W - margin.left - margin.right;
+  const innerH = H - margin.top - margin.bottom;
+
+  const svg = d3.select(wrap).append('svg')
+    .attr('viewBox', `0 0 ${W} ${H}`)
+    .attr('preserveAspectRatio', 'xMidYMid meet')
+    .style('background', '#0d1117');
+
+  svg.append('rect').attr('x', margin.left).attr('y', margin.top)
+    .attr('width', innerW).attr('height', innerH).attr('fill', '#161b22');
+
+  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+  const volStrikes = data.strikes;
+  const maxVol = Math.max(
+    ...volStrikes.map(s => (data.call_vol[String(s)] || 0) + (data.put_vol[String(s)] || 0)),
+    1
+  );
+
+  const xScale = d3.scaleBand().domain(volStrikes).range([0, innerW]).padding(0.1);
+  const yScale = d3.scaleLinear().domain([0, maxVol * 1.12]).range([innerH, 0]);
+
+  // Grid
+  for (const v of yScale.ticks(5)) {
+    g.append('line').attr('x1', 0).attr('x2', innerW)
+      .attr('y1', yScale(v)).attr('y2', yScale(v))
+      .attr('stroke', '#21262d').attr('stroke-width', 0.5).attr('opacity', 0.5);
+  }
+
+  // Stacked bars (put on bottom, call on top)
+  for (const s of volStrikes) {
+    const sk = String(s);
+    const cv = data.call_vol[sk] || 0;
+    const pv = data.put_vol[sk] || 0;
+    const x  = xScale(s);
+    const bw = xScale.bandwidth();
+
+    if (pv > 0) {
+      g.append('rect').attr('x', x).attr('y', yScale(pv)).attr('width', bw)
+        .attr('height', innerH - yScale(pv))
+        .attr('fill', '#f44336').attr('opacity', 0.8);
+    }
+    if (cv > 0) {
+      g.append('rect').attr('x', x).attr('y', yScale(pv + cv)).attr('width', bw)
+        .attr('height', innerH - yScale(cv))
+        .attr('fill', '#4CAF50').attr('opacity', 0.8);
+    }
+  }
+
+  // Spot line
+  if (volStrikes.length) {
+    const nearSpot = volStrikes.reduce((p, c) => Math.abs(c - data.spot) < Math.abs(p - data.spot) ? c : p);
+    const sx = xScale(nearSpot) + xScale.bandwidth() / 2;
+    g.append('line').attr('x1', sx).attr('x2', sx).attr('y1', 0).attr('y2', innerH)
+      .attr('stroke', '#ffd740').attr('stroke-width', 2).attr('stroke-dasharray', '6 3');
+    g.append('text').attr('x', sx + 4).attr('y', 14)
+      .attr('fill', '#ffd740').attr('font-size', '10px').attr('font-weight', 'bold')
+      .text('SPOT');
+  }
+
+  // Top 3 volume labels
+  for (const { strike, vol } of data.top3_vol) {
+    const nearS = volStrikes.reduce((p, c) => Math.abs(c - strike) < Math.abs(p - strike) ? c : p);
+    if (Math.abs(nearS - strike) > 500) continue;
+    const sk = String(nearS);
+    const tot = (data.call_vol[sk] || 0) + (data.put_vol[sk] || 0);
+    if (tot === 0) continue;
+    const x = xScale(nearS) + xScale.bandwidth() / 2;
+    g.append('text').attr('x', x).attr('y', yScale(tot) - 5)
+      .attr('text-anchor', 'middle').attr('fill', '#ffd740').attr('font-size', '9px').attr('font-weight', 'bold')
+      .text(Math.round(tot).toLocaleString());
+  }
+
+  // X axis (every 5000)
+  const xTicks = volStrikes.filter(s => s % 5000 === 0);
+  const xAxisG = g.append('g').attr('transform', `translate(0,${innerH})`).call(
+    d3.axisBottom(xScale).tickValues(xTicks).tickFormat(d => '¥' + (+d / 1000).toFixed(0) + 'k')
+  );
+  xAxisG.selectAll('text').attr('fill', '#c9d1d9').attr('font-size', '10px')
+    .attr('transform', 'rotate(-45)').attr('text-anchor', 'end');
+  xAxisG.selectAll('.domain').attr('stroke', '#30363d');
+  xAxisG.selectAll('.tick line').attr('stroke', '#30363d');
+
+  // Y axis
+  const yAxisG = g.append('g').call(
+    d3.axisLeft(yScale).ticks(5).tickFormat(d => d >= 1000 ? (d / 1000).toFixed(0) + 'k' : d)
+  );
+  yAxisG.selectAll('text').attr('fill', '#8b949e').attr('font-size', '10px');
+  yAxisG.selectAll('.domain').attr('stroke', '#30363d');
+  yAxisG.selectAll('.tick line').attr('stroke', '#30363d');
+
+  // Legend
+  g.append('rect').attr('x', innerW - 90).attr('y', 4).attr('width', 12).attr('height', 12)
+    .attr('fill', '#4CAF50').attr('opacity', 0.8);
+  g.append('text').attr('x', innerW - 74).attr('y', 14)
+    .attr('fill', '#c9d1d9').attr('font-size', '11px').text('コール');
+  g.append('rect').attr('x', innerW - 90).attr('y', 22).attr('width', 12).attr('height', 12)
+    .attr('fill', '#f44336').attr('opacity', 0.8);
+  g.append('text').attr('x', innerW - 74).attr('y', 32)
+    .attr('fill', '#c9d1d9').attr('font-size', '11px').text('プット');
+
+  // Title
+  svg.append('text').attr('x', W / 2).attr('y', 30)
+    .attr('text-anchor', 'middle').attr('fill', '#c9d1d9').attr('font-size', '13px').attr('font-weight', 'bold')
+    .text(`NK225 ¥${data.spot.toLocaleString()} — 出来高分布 — ${dateLabel}`);
+}
+</script>
+</body>
+</html>
