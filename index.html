@@ -25,7 +25,7 @@
       flex-wrap: wrap;
     }
     .logo {
-      font-size: 18px;
+      font-size: 20px;
       font-weight: 700;
       color: #c9d1d9;
       letter-spacing: 0.02em;
@@ -37,23 +37,19 @@
       align-items: center;
       gap: 12px;
     }
-    .date-label-small {
-      font-size: 13px;
-      color: #8b949e;
-    }
 
     /* ── Date selector ── */
     .controls {
       background: #161b22;
       border-bottom: 1px solid #21262d;
-      padding: 12px 24px;
+      padding: 14px 24px;
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 12px;
       flex-wrap: wrap;
     }
     .controls label {
-      font-size: 13px;
+      font-size: 14px;
       color: #8b949e;
     }
     select#date-picker {
@@ -61,11 +57,11 @@
       color: #c9d1d9;
       border: 1px solid #30363d;
       border-radius: 6px;
-      padding: 6px 10px;
-      font-size: 14px;
+      padding: 8px 12px;
+      font-size: 15px;
       cursor: pointer;
       outline: none;
-      min-width: 140px;
+      min-width: 150px;
     }
     select#date-picker:focus { border-color: #4CAF50; }
 
@@ -74,7 +70,7 @@
       color: #c9d1d9;
       border: 1px solid #30363d;
       border-radius: 6px;
-      padding: 6px 12px;
+      padding: 8px 16px;
       font-size: 14px;
       cursor: pointer;
     }
@@ -84,15 +80,15 @@
     /* ── Stats bar ── */
     .stats-bar {
       display: flex;
-      gap: 24px;
-      padding: 12px 24px;
+      gap: 28px;
+      padding: 14px 24px;
       background: #0d1117;
       border-bottom: 1px solid #21262d;
       flex-wrap: wrap;
     }
-    .stat-item { display: flex; flex-direction: column; gap: 2px; }
-    .stat-label { font-size: 11px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.05em; }
-    .stat-value { font-size: 16px; font-weight: 600; color: #c9d1d9; }
+    .stat-item { display: flex; flex-direction: column; gap: 3px; }
+    .stat-label { font-size: 12px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat-value { font-size: 18px; font-weight: 600; color: #c9d1d9; }
     .stat-value.up   { color: #4CAF50; }
     .stat-value.down { color: #f44336; }
     .stat-value.warn { color: #ffd740; }
@@ -112,7 +108,7 @@
       gap: 8px;
     }
     .chart-title {
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 600;
       color: #8b949e;
       text-transform: uppercase;
@@ -121,10 +117,28 @@
     .chart-wrap { width: 100%; overflow: hidden; }
     .chart-wrap svg { display: block; width: 100%; }
 
+    /* ── Tooltip ── */
+    #tooltip {
+      position: fixed;
+      background: #1c2128;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #c9d1d9;
+      pointer-events: none;
+      display: none;
+      z-index: 100;
+      white-space: nowrap;
+      line-height: 1.7;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    }
+    #tooltip b { color: #ffd740; }
+
     /* ── Footer ── */
     footer {
       padding: 20px 24px;
-      font-size: 11px;
+      font-size: 12px;
       color: #484f58;
       border-top: 1px solid #21262d;
       line-height: 1.8;
@@ -137,36 +151,38 @@
       align-items: center;
       justify-content: center;
       height: 300px;
-      font-size: 14px;
+      font-size: 15px;
       color: #8b949e;
     }
     .spinner {
-      width: 20px; height: 20px;
+      width: 22px; height: 22px;
       border: 2px solid #30363d;
       border-top-color: #4CAF50;
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
-      margin-right: 10px;
+      margin-right: 12px;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
 
+<div id="tooltip"></div>
+
 <header>
   <div class="logo">Delta<span>Signal</span></div>
-  <div style="font-size:13px;color:#8b949e;">NK225 Options Analysis</div>
+  <div style="font-size:14px;color:#8b949e;">NK225 Options Analysis</div>
   <div class="header-right">
-    <a href="https://note.com/deltasignal_ai" target="_blank"
-       style="font-size:12px;color:#58a6ff;text-decoration:none;">note.com →</a>
+    <a href="https://note.com/deltasignal" target="_blank"
+       style="font-size:13px;color:#58a6ff;text-decoration:none;">note.com →</a>
   </div>
 </header>
 
 <div class="controls">
   <label for="date-picker">データ日付</label>
-  <button class="nav-btn" id="btn-prev" onclick="navigateDate(-1)">◀ 前日</button>
+  <button class="nav-btn" id="btn-prev" onclick="navigateDate(1)">◀ 前日</button>
   <select id="date-picker" onchange="loadDate(this.value)"></select>
-  <button class="nav-btn" id="btn-next" onclick="navigateDate(1)">翌日 ▶</button>
+  <button class="nav-btn" id="btn-next" onclick="navigateDate(-1)">翌日 ▶</button>
 </div>
 
 <div class="stats-bar" id="stats-bar">
@@ -225,7 +241,7 @@
   データソース: JPX（日本取引所グループ）日次決済データ。GEXはBlack-Scholesガンマを用いた推定値であり、
   実際の市場参加者のポジションとは異なる場合があります。本サイトは情報提供を目的としており、
   投資勧誘・売買推奨を意図するものではありません。<br>
-  © DeltaSignal · <a href="https://note.com/deltasignal_ai" target="_blank">note.com</a> ·
+  © DeltaSignal · <a href="https://note.com/deltasignal" target="_blank">note.com</a> ·
   <a href="https://deltasignalz.substack.com/" target="_blank">Substack</a>
 </footer>
 
@@ -234,6 +250,21 @@
 let allDates = [];
 let currentIndex = 0;
 let currentData = null;
+
+// ── Tooltip helper ────────────────────────────────────────────────────────────
+const tip = document.getElementById('tooltip');
+function showTip(event, html) {
+  tip.innerHTML = html;
+  tip.style.display = 'block';
+  moveTip(event);
+}
+function moveTip(event) {
+  const x = event.clientX + 16;
+  const y = event.clientY - 10;
+  tip.style.left = (x + tip.offsetWidth > window.innerWidth ? x - tip.offsetWidth - 32 : x) + 'px';
+  tip.style.top  = (y + tip.offsetHeight > window.innerHeight ? y - tip.offsetHeight : y) + 'px';
+}
+function hideTip() { tip.style.display = 'none'; }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
 fetch('data/dates.json')
@@ -254,6 +285,8 @@ fetch('data/dates.json')
   });
 
 // ── Navigation ────────────────────────────────────────────────────────────────
+// allDates is newest-first: index 0 = newest, index N-1 = oldest
+// 前日 (older) = index+1,  翌日 (newer) = index-1
 function navigateDate(dir) {
   const newIdx = currentIndex + dir;
   if (newIdx < 0 || newIdx >= allDates.length) return;
@@ -263,6 +296,7 @@ function navigateDate(dir) {
 function loadDate(date) {
   currentIndex = allDates.indexOf(date);
   document.getElementById('date-picker').value = date;
+  // 前日 disabled when at oldest (last index); 翌日 disabled when at newest (index 0)
   document.getElementById('btn-prev').disabled = currentIndex >= allDates.length - 1;
   document.getElementById('btn-next').disabled = currentIndex <= 0;
 
@@ -288,26 +322,21 @@ function loadDate(date) {
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
 function renderStats(s) {
-  const spot = document.getElementById('stat-spot');
-  spot.textContent = '¥' + s.spot.toLocaleString();
+  document.getElementById('stat-spot').textContent = '¥' + Math.round(s.spot).toLocaleString();
 
   const pcr = document.getElementById('stat-pcr');
   pcr.textContent = s.pcr.toFixed(2);
   pcr.className = 'stat-value ' + (s.pcr >= 1.5 ? 'down' : s.pcr >= 1.0 ? 'warn' : '');
 
-  const callIv = document.getElementById('stat-call-iv');
-  callIv.textContent = s.atm_call_iv != null ? s.atm_call_iv.toFixed(1) + '%' : '—';
-
-  const putIv = document.getElementById('stat-put-iv');
-  putIv.textContent = s.atm_put_iv != null ? s.atm_put_iv.toFixed(1) + '%' : '—';
+  document.getElementById('stat-call-iv').textContent = s.atm_call_iv != null ? s.atm_call_iv.toFixed(1) + '%' : '—';
+  document.getElementById('stat-put-iv').textContent  = s.atm_put_iv  != null ? s.atm_put_iv.toFixed(1)  + '%' : '—';
 
   const flip = document.getElementById('stat-flip');
   flip.textContent = '¥' + Math.round(s.gex_flip).toLocaleString();
-  const abovFlip = s.spot >= s.gex_flip;
-  flip.className = 'stat-value ' + (abovFlip ? 'up' : 'down');
+  flip.className = 'stat-value ' + (s.spot >= s.gex_flip ? 'up' : 'down');
 
   document.getElementById('stat-call-oi').textContent = s.total_call_oi.toLocaleString() + '枚';
-  document.getElementById('stat-put-oi').textContent  = s.total_put_oi.toLocaleString() + '枚';
+  document.getElementById('stat-put-oi').textContent  = s.total_put_oi.toLocaleString()  + '枚';
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -318,7 +347,6 @@ function clearWrap(id) {
 }
 
 const EXP_COLORS = {
-  // front 3 slots — picked dynamically based on position in expirations array
   0: { call: '#4CAF50', put: '#f44336' },
   1: { call: '#81C784', put: '#e57373' },
   2: { call: '#A5D6A7', put: '#ef9a9a' },
@@ -327,8 +355,8 @@ const EXP_COLORS = {
 // ── OI Profile ────────────────────────────────────────────────────────────────
 function renderOI(data, dateLabel) {
   const wrap = clearWrap('wrap-oi');
-  const W = 800, H = 640;
-  const margin = { top: 50, right: 120, bottom: 40, left: 100 };
+  const W = 840, H = 660;
+  const margin = { top: 68, right: 130, bottom: 44, left: 110 };
   const innerW = W - margin.left - margin.right;
   const innerH = H - margin.top - margin.bottom;
 
@@ -345,16 +373,22 @@ function renderOI(data, dateLabel) {
   const allStrikes = data.strikes.filter(s => s % 250 === 0);
   const exps = data.expirations;
 
+  // Total OI per strike (for tooltip)
+  const totalCallOI = {}, totalPutOI = {};
+  for (const s of allStrikes) {
+    const sk = String(s);
+    totalCallOI[sk] = 0; totalPutOI[sk] = 0;
+    for (const exp of exps) {
+      totalCallOI[sk] += (data.call_oi[exp] || {})[sk] || 0;
+      totalPutOI[sk]  += (data.put_oi[exp]  || {})[sk] || 0;
+    }
+  }
+
   let maxOI = 1;
   for (const s of allStrikes) {
     const sk = String(s);
-    for (let i = 0; i < exps.length; i++) {
-      const exp = exps[i];
-      const c = (data.call_oi[exp] || {})[sk] || 0;
-      const p = (data.put_oi[exp] || {})[sk] || 0;
-      if (c > maxOI) maxOI = c;
-      if (p > maxOI) maxOI = p;
-    }
+    if (totalCallOI[sk] > maxOI) maxOI = totalCallOI[sk];
+    if (totalPutOI[sk]  > maxOI) maxOI = totalPutOI[sk];
   }
 
   const yScale = d3.scaleBand()
@@ -379,17 +413,32 @@ function renderOI(data, dateLabel) {
   g.append('line').attr('x1', cx).attr('x2', cx).attr('y1', 0).attr('y2', innerH)
     .attr('stroke', '#30363d').attr('stroke-width', 1);
 
-  // Bars
+  // Bars with tooltip
   for (const s of allStrikes) {
     const sk = String(s);
     let callOff = 0, putOff = 0;
+    const cTot = totalCallOI[sk], pTot = totalPutOI[sk];
+    const bh = yScale.bandwidth();
+    const y = yScale(s);
+
+    // Invisible hit area for tooltip
+    g.append('rect')
+      .attr('x', cx - xScale(pTot)).attr('y', y)
+      .attr('width', xScale(cTot) + xScale(pTot)).attr('height', bh)
+      .attr('fill', 'transparent')
+      .on('mouseover', (ev) => showTip(ev,
+        `<b>¥${s.toLocaleString()}</b><br>` +
+        `コールOI: <span style="color:#4CAF50">${Math.round(cTot).toLocaleString()}枚</span><br>` +
+        `プットOI: <span style="color:#f44336">${Math.round(pTot).toLocaleString()}枚</span>`
+      ))
+      .on('mousemove', moveTip)
+      .on('mouseout', hideTip);
+
     for (let i = 0; i < exps.length; i++) {
       const exp = exps[i];
       const col = EXP_COLORS[i] || EXP_COLORS[0];
       const coi = (data.call_oi[exp] || {})[sk] || 0;
-      const poi = (data.put_oi[exp] || {})[sk] || 0;
-      const y = yScale(s);
-      const bh = yScale.bandwidth();
+      const poi = (data.put_oi[exp]  || {})[sk] || 0;
 
       if (coi > 0) {
         g.append('rect').attr('x', cx + xScale(callOff)).attr('y', y)
@@ -413,34 +462,30 @@ function renderOI(data, dateLabel) {
     g.append('line').attr('x1', 0).attr('x2', innerW)
       .attr('y1', sy + yScale.bandwidth() / 2).attr('y2', sy + yScale.bandwidth() / 2)
       .attr('stroke', '#ffd740').attr('stroke-width', 1.5).attr('stroke-dasharray', '6 3');
-    g.append('text').attr('x', innerW + 6).attr('y', sy + yScale.bandwidth() / 2 + 4)
-      .attr('fill', '#ffd740').attr('font-size', '10px').attr('font-weight', 'bold')
-      .text('¥' + data.spot.toLocaleString());
+    g.append('text').attr('x', innerW + 6).attr('y', sy + yScale.bandwidth() / 2 + 5)
+      .attr('fill', '#ffd740').attr('font-size', '12px').attr('font-weight', 'bold')
+      .text('¥' + Math.round(data.spot).toLocaleString());
   }
 
   // Top3 labels
-  for (const { strike, oi } of data.top3_call) {
+  for (const { strike } of data.top3_call) {
     const nearS = allStrikes.reduce((p, c) => Math.abs(c - strike) < Math.abs(p - strike) ? c : p);
     if (Math.abs(nearS - strike) > 300) continue;
     const sk = String(nearS);
-    let tot = 0;
-    for (const exp of exps) tot += (data.call_oi[exp] || {})[sk] || 0;
+    const tot = totalCallOI[sk] || 0;
     if (tot === 0) continue;
-    const y = yScale(nearS);
-    g.append('text').attr('x', cx + xScale(tot) + 5).attr('y', y + yScale.bandwidth() / 2 + 4)
-      .attr('fill', '#4CAF50').attr('font-size', '9px').attr('font-weight', 'bold')
+    g.append('text').attr('x', cx + xScale(tot) + 5).attr('y', yScale(nearS) + yScale.bandwidth() / 2 + 5)
+      .attr('fill', '#4CAF50').attr('font-size', '11px').attr('font-weight', 'bold')
       .text(Math.round(tot).toLocaleString());
   }
-  for (const { strike, oi } of data.top3_put) {
+  for (const { strike } of data.top3_put) {
     const nearS = allStrikes.reduce((p, c) => Math.abs(c - strike) < Math.abs(p - strike) ? c : p);
     if (Math.abs(nearS - strike) > 300) continue;
     const sk = String(nearS);
-    let tot = 0;
-    for (const exp of exps) tot += (data.put_oi[exp] || {})[sk] || 0;
+    const tot = totalPutOI[sk] || 0;
     if (tot === 0) continue;
-    const y = yScale(nearS);
-    g.append('text').attr('x', cx - xScale(tot) - 5).attr('y', y + yScale.bandwidth() / 2 + 4)
-      .attr('text-anchor', 'end').attr('fill', '#f44336').attr('font-size', '9px').attr('font-weight', 'bold')
+    g.append('text').attr('x', cx - xScale(tot) - 5).attr('y', yScale(nearS) + yScale.bandwidth() / 2 + 5)
+      .attr('text-anchor', 'end').attr('fill', '#f44336').attr('font-size', '11px').attr('font-weight', 'bold')
       .text(Math.round(tot).toLocaleString());
   }
 
@@ -449,7 +494,7 @@ function renderOI(data, dateLabel) {
   const yAxisG = g.append('g').call(
     d3.axisLeft(yScale).tickValues(yTicks).tickFormat(d => '¥' + (+d).toLocaleString())
   );
-  yAxisG.selectAll('text').attr('fill', '#c9d1d9').attr('font-size', '10px');
+  yAxisG.selectAll('text').attr('fill', '#c9d1d9').attr('font-size', '12px');
   yAxisG.selectAll('.domain').attr('stroke', '#30363d');
   yAxisG.selectAll('.tick line').attr('stroke', '#30363d');
 
@@ -458,43 +503,43 @@ function renderOI(data, dateLabel) {
     if (v === 0) continue;
     const label = v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v);
     for (const dir of [1, -1]) {
-      g.append('text').attr('x', cx + dir * xScale(v)).attr('y', innerH + 18)
-        .attr('text-anchor', 'middle').attr('fill', '#8b949e').attr('font-size', '9px').text(label);
+      g.append('text').attr('x', cx + dir * xScale(v)).attr('y', innerH + 20)
+        .attr('text-anchor', 'middle').attr('fill', '#8b949e').attr('font-size', '11px').text(label);
     }
   }
 
-  // Headers
-  g.append('text').attr('x', cx + innerW * 0.14).attr('y', -12)
-    .attr('text-anchor', 'middle').attr('fill', '#4CAF50').attr('font-size', '12px').attr('font-weight', 'bold')
+  // Side headers — placed inside chart area, well clear of SVG title
+  g.append('text').attr('x', cx + innerW * 0.14).attr('y', 22)
+    .attr('text-anchor', 'middle').attr('fill', '#4CAF50').attr('font-size', '13px').attr('font-weight', 'bold')
     .text('コール →');
-  g.append('text').attr('x', cx - innerW * 0.14).attr('y', -12)
-    .attr('text-anchor', 'middle').attr('fill', '#f44336').attr('font-size', '12px').attr('font-weight', 'bold')
+  g.append('text').attr('x', cx - innerW * 0.14).attr('y', 22)
+    .attr('text-anchor', 'middle').attr('fill', '#f44336').attr('font-size', '13px').attr('font-weight', 'bold')
     .text('← プット');
 
   // Legend
-  const legX = innerW - 120, legY = 0;
+  const legX = innerW - 110, legY = 36;
   for (let i = 0; i < exps.length; i++) {
     const exp = exps[i];
     const col = EXP_COLORS[i] || EXP_COLORS[0];
     const label = (data.expiry_labels || {})[exp] || exp;
-    const ly = legY + i * 20;
-    g.append('rect').attr('x', legX).attr('y', ly).attr('width', 10).attr('height', 10).attr('fill', col.call).attr('opacity', 0.88);
-    g.append('rect').attr('x', legX + 14).attr('y', ly).attr('width', 10).attr('height', 10).attr('fill', col.put).attr('opacity', 0.88);
-    g.append('text').attr('x', legX + 28).attr('y', ly + 9)
-      .attr('fill', '#c9d1d9').attr('font-size', '10px').text(label);
+    const ly = legY + i * 22;
+    g.append('rect').attr('x', legX).attr('y', ly).attr('width', 11).attr('height', 11).attr('fill', col.call).attr('opacity', 0.88);
+    g.append('rect').attr('x', legX + 15).attr('y', ly).attr('width', 11).attr('height', 11).attr('fill', col.put).attr('opacity', 0.88);
+    g.append('text').attr('x', legX + 30).attr('y', ly + 10)
+      .attr('fill', '#c9d1d9').attr('font-size', '12px').text(label);
   }
 
   // Title
-  svg.append('text').attr('x', W / 2).attr('y', 32)
-    .attr('text-anchor', 'middle').attr('fill', '#c9d1d9').attr('font-size', '13px').attr('font-weight', 'bold')
-    .text(`NK225 ¥${data.spot.toLocaleString()} — OI プロファイル — ${dateLabel}`);
+  svg.append('text').attr('x', W / 2).attr('y', 30)
+    .attr('text-anchor', 'middle').attr('fill', '#c9d1d9').attr('font-size', '14px').attr('font-weight', 'bold')
+    .text(`NK225 ¥${Math.round(data.spot).toLocaleString()} — OI プロファイル — ${dateLabel}`);
 }
 
 // ── GEX ──────────────────────────────────────────────────────────────────────
 function renderGEX(data, dateLabel) {
   const wrap = clearWrap('wrap-gex');
-  const W = 800, H = 480;
-  const margin = { top: 50, right: 30, bottom: 55, left: 75 };
+  const W = 840, H = 500;
+  const margin = { top: 60, right: 30, bottom: 60, left: 85 };
   const innerW = W - margin.left - margin.right;
   const innerH = H - margin.top - margin.bottom;
 
@@ -531,7 +576,7 @@ function renderGEX(data, dateLabel) {
     .attr('y1', yScale(0)).attr('y2', yScale(0))
     .attr('stroke', '#8b949e').attr('stroke-width', 1);
 
-  // Bars
+  // Bars with tooltip
   for (const d of gexEntries) {
     g.append('rect')
       .attr('x', xScale(d.strike))
@@ -539,7 +584,14 @@ function renderGEX(data, dateLabel) {
       .attr('y', d.gex >= 0 ? yScale(d.gex) : yScale(0))
       .attr('height', Math.abs(yScale(d.gex) - yScale(0)))
       .attr('fill', d.gex >= 0 ? '#4CAF50' : '#f44336')
-      .attr('opacity', 0.85);
+      .attr('opacity', 0.85)
+      .on('mouseover', (ev) => showTip(ev,
+        `<b>¥${d.strike.toLocaleString()}</b><br>` +
+        `GEX: <span style="color:${d.gex >= 0 ? '#4CAF50' : '#f44336'}">${d.gex >= 0 ? '+' : ''}${d.gex.toFixed(3)}</span><br>` +
+        `${d.gex >= 0 ? '▲ ポジティブ（安定ゾーン）' : '▼ ネガティブ（加速ゾーン）'}`
+      ))
+      .on('mousemove', moveTip)
+      .on('mouseout', hideTip);
   }
 
   // Spot line
@@ -548,9 +600,9 @@ function renderGEX(data, dateLabel) {
     const sx = xScale(nearSpot) + xScale.bandwidth() / 2;
     g.append('line').attr('x1', sx).attr('x2', sx).attr('y1', 0).attr('y2', innerH)
       .attr('stroke', '#ffd740').attr('stroke-width', 2).attr('stroke-dasharray', '6 3');
-    g.append('text').attr('x', sx + 5).attr('y', 14)
-      .attr('fill', '#ffd740').attr('font-size', '10px').attr('font-weight', 'bold')
-      .text('SPOT ¥' + data.spot.toLocaleString());
+    g.append('text').attr('x', sx + 6).attr('y', 16)
+      .attr('fill', '#ffd740').attr('font-size', '12px').attr('font-weight', 'bold')
+      .text('SPOT ¥' + Math.round(data.spot).toLocaleString());
   }
 
   // Flip line
@@ -561,8 +613,8 @@ function renderGEX(data, dateLabel) {
       const fx = xScale(nearFlip) + xScale.bandwidth() / 2;
       g.append('line').attr('x1', fx).attr('x2', fx).attr('y1', 0).attr('y2', innerH)
         .attr('stroke', '#bb86fc').attr('stroke-width', 1.5).attr('stroke-dasharray', '4 2');
-      g.append('text').attr('x', fx + 5).attr('y', 28)
-        .attr('fill', '#bb86fc').attr('font-size', '10px').attr('font-weight', 'bold')
+      g.append('text').attr('x', fx + 6).attr('y', 32)
+        .attr('fill', '#bb86fc').attr('font-size', '12px').attr('font-weight', 'bold')
         .text('FLIP ¥' + Math.round(fp).toLocaleString());
     }
   }
@@ -572,7 +624,7 @@ function renderGEX(data, dateLabel) {
   const xAxisG = g.append('g').attr('transform', `translate(0,${innerH})`).call(
     d3.axisBottom(xScale).tickValues(xTicks).tickFormat(d => '¥' + (+d / 1000).toFixed(0) + 'k')
   );
-  xAxisG.selectAll('text').attr('fill', '#c9d1d9').attr('font-size', '10px');
+  xAxisG.selectAll('text').attr('fill', '#c9d1d9').attr('font-size', '12px');
   xAxisG.selectAll('.domain').attr('stroke', '#30363d');
   xAxisG.selectAll('.tick line').attr('stroke', '#30363d');
 
@@ -583,35 +635,35 @@ function renderGEX(data, dateLabel) {
       return a >= 1000 ? (d / 1000).toFixed(1) + 'k' : d.toFixed(2);
     })
   );
-  yAxisG.selectAll('text').attr('fill', '#8b949e').attr('font-size', '10px');
+  yAxisG.selectAll('text').attr('fill', '#8b949e').attr('font-size', '12px');
   yAxisG.selectAll('.domain').attr('stroke', '#30363d');
   yAxisG.selectAll('.tick line').attr('stroke', '#30363d');
 
   // Zone labels
-  g.append('text').attr('x', 8).attr('y', yScale(maxAbsGex * 0.8))
-    .attr('fill', '#4CAF50').attr('font-size', '10px').attr('opacity', 0.85)
+  g.append('text').attr('x', 8).attr('y', yScale(maxAbsGex * 0.82))
+    .attr('fill', '#4CAF50').attr('font-size', '12px').attr('opacity', 0.85)
     .text('▲ ポジティブGEX（安定）');
-  g.append('text').attr('x', 8).attr('y', yScale(-maxAbsGex * 0.8))
-    .attr('fill', '#f44336').attr('font-size', '10px').attr('opacity', 0.85)
+  g.append('text').attr('x', 8).attr('y', yScale(-maxAbsGex * 0.82))
+    .attr('fill', '#f44336').attr('font-size', '12px').attr('opacity', 0.85)
     .text('▼ ネガティブGEX（加速）');
 
   // Y label
   svg.append('text').attr('transform', 'rotate(-90)')
-    .attr('x', -(margin.top + innerH / 2)).attr('y', 16)
-    .attr('text-anchor', 'middle').attr('fill', '#8b949e').attr('font-size', '10px')
+    .attr('x', -(margin.top + innerH / 2)).attr('y', 18)
+    .attr('text-anchor', 'middle').attr('fill', '#8b949e').attr('font-size', '12px')
     .text('GEX（推定）');
 
   // Title
-  svg.append('text').attr('x', W / 2).attr('y', 30)
-    .attr('text-anchor', 'middle').attr('fill', '#c9d1d9').attr('font-size', '13px').attr('font-weight', 'bold')
-    .text(`NK225 ¥${data.spot.toLocaleString()} — GEX — ${dateLabel}`);
+  svg.append('text').attr('x', W / 2).attr('y', 32)
+    .attr('text-anchor', 'middle').attr('fill', '#c9d1d9').attr('font-size', '14px').attr('font-weight', 'bold')
+    .text(`NK225 ¥${Math.round(data.spot).toLocaleString()} — GEX — ${dateLabel}`);
 }
 
 // ── IV Smile ─────────────────────────────────────────────────────────────────
 function renderIV(data, dateLabel) {
   const wrap = clearWrap('wrap-iv');
-  const W = 800, H = 480;
-  const margin = { top: 50, right: 140, bottom: 55, left: 70 };
+  const W = 840, H = 500;
+  const margin = { top: 60, right: 150, bottom: 60, left: 80 };
   const innerW = W - margin.left - margin.right;
   const innerH = H - margin.top - margin.bottom;
 
@@ -630,10 +682,8 @@ function renderIV(data, dateLabel) {
   const sMin = 62000, sMax = 80000;
   const ivValid = v => v > 8 && v < 100;
 
-  // Color per expiry slot
   const EXP_LINE_COLORS = ['#FFD54F', '#4FC3F7', '#AB47BC'];
 
-  // Collect all valid IVs for scale
   let allIVs = [];
   for (let i = 0; i < exps.length; i++) {
     const exp = exps[i];
@@ -667,20 +717,20 @@ function renderIV(data, dateLabel) {
   g.append('line').attr('x1', xScale(spot)).attr('x2', xScale(spot))
     .attr('y1', 0).attr('y2', innerH)
     .attr('stroke', '#ffd740').attr('stroke-width', 2).attr('stroke-dasharray', '6 3');
-  g.append('text').attr('x', xScale(spot) + 5).attr('y', 14)
-    .attr('fill', '#ffd740').attr('font-size', '10px').attr('font-weight', 'bold')
-    .text('¥' + spot.toLocaleString());
+  g.append('text').attr('x', xScale(spot) + 6).attr('y', 16)
+    .attr('fill', '#ffd740').attr('font-size', '12px').attr('font-weight', 'bold')
+    .text('¥' + Math.round(spot).toLocaleString());
 
   const lineGen = d3.line()
     .x(d => xScale(d.s))
     .y(d => yScale(d.iv))
     .curve(d3.curveMonotoneX);
 
-  // Draw lines
+  // Draw lines and dots
   for (let i = 0; i < exps.length; i++) {
     const exp = exps[i];
     const color = EXP_LINE_COLORS[i] || '#ccc';
-    const label = (data.expiry_labels || {})[exp] || exp;
+    const expLabel = (data.expiry_labels || {})[exp] || exp;
 
     for (const [side, dict] of [['call', data.call_iv[exp] || {}], ['put', data.put_iv[exp] || {}]]) {
       const pts = Object.entries(dict)
@@ -694,18 +744,32 @@ function renderIV(data, dateLabel) {
         .datum(pts)
         .attr('fill', 'none')
         .attr('stroke', color)
-        .attr('stroke-width', side === 'call' ? 2 : 1.5)
-        .attr('stroke-dasharray', side === 'put' ? '5 3' : 'none')
+        .attr('stroke-width', side === 'call' ? 2.5 : 2)
+        .attr('stroke-dasharray', side === 'put' ? '6 3' : 'none')
         .attr('opacity', 0.9)
         .attr('d', lineGen);
 
-      g.selectAll(null).data(pts.filter((_, j) => j % 3 === 0))
+      // Dots with tooltip
+      g.selectAll(null).data(pts)
         .enter().append('circle')
         .attr('cx', d => xScale(d.s))
         .attr('cy', d => yScale(d.iv))
-        .attr('r', 2.5)
+        .attr('r', 4)
         .attr('fill', color)
-        .attr('opacity', 0.7);
+        .attr('opacity', 0.75)
+        .style('cursor', 'crosshair')
+        .on('mouseover', function(ev, d) {
+          d3.select(this).attr('r', 6).attr('opacity', 1);
+          showTip(ev,
+            `<b>¥${d.s.toLocaleString()}</b> — ${expLabel} ${side === 'call' ? 'コール' : 'プット'}<br>` +
+            `IV: <span style="color:${color}">${d.iv.toFixed(2)}%</span>`
+          );
+        })
+        .on('mousemove', moveTip)
+        .on('mouseout', function() {
+          d3.select(this).attr('r', 4).attr('opacity', 0.75);
+          hideTip();
+        });
     }
   }
 
@@ -713,7 +777,7 @@ function renderIV(data, dateLabel) {
   const xAxisG = g.append('g').attr('transform', `translate(0,${innerH})`).call(
     d3.axisBottom(xScale).ticks(8).tickFormat(d => '¥' + (+d / 1000).toFixed(0) + 'k')
   );
-  xAxisG.selectAll('text').attr('fill', '#c9d1d9').attr('font-size', '10px');
+  xAxisG.selectAll('text').attr('fill', '#c9d1d9').attr('font-size', '12px');
   xAxisG.selectAll('.domain').attr('stroke', '#30363d');
   xAxisG.selectAll('.tick line').attr('stroke', '#30363d');
 
@@ -721,47 +785,49 @@ function renderIV(data, dateLabel) {
   const yAxisG = g.append('g').call(
     d3.axisLeft(yScale).ticks(6).tickFormat(d => d.toFixed(0) + '%')
   );
-  yAxisG.selectAll('text').attr('fill', '#8b949e').attr('font-size', '10px');
+  yAxisG.selectAll('text').attr('fill', '#8b949e').attr('font-size', '12px');
   yAxisG.selectAll('.domain').attr('stroke', '#30363d');
   yAxisG.selectAll('.tick line').attr('stroke', '#30363d');
 
   // Y label
   svg.append('text').attr('transform', 'rotate(-90)')
-    .attr('x', -(margin.top + innerH / 2)).attr('y', 16)
-    .attr('text-anchor', 'middle').attr('fill', '#8b949e').attr('font-size', '10px')
+    .attr('x', -(margin.top + innerH / 2)).attr('y', 18)
+    .attr('text-anchor', 'middle').attr('fill', '#8b949e').attr('font-size', '12px')
     .text('Implied Volatility (%)');
 
   // Legend
-  const legX = innerW + 15;
+  const legX = innerW + 16;
   for (let i = 0; i < exps.length; i++) {
     const exp = exps[i];
     const color = EXP_LINE_COLORS[i] || '#ccc';
     const label = (data.expiry_labels || {})[exp] || exp;
-    const ly = i * 40;
+    const ly = i * 48;
 
-    g.append('line').attr('x1', legX).attr('x2', legX + 22)
-      .attr('y1', ly + 8).attr('y2', ly + 8)
-      .attr('stroke', color).attr('stroke-width', 2);
-    g.append('text').attr('x', legX).attr('y', ly + 4)
-      .attr('fill', color).attr('font-size', '10px').attr('font-weight', 'bold')
-      .text(label);
-    g.append('text').attr('x', legX).attr('y', ly + 18)
-      .attr('fill', '#8b949e').attr('font-size', '9px').text('— コール');
-    g.append('text').attr('x', legX).attr('y', ly + 30)
-      .attr('fill', '#8b949e').attr('font-size', '9px').text('- - プット');
+    g.append('text').attr('x', legX).attr('y', ly + 5)
+      .attr('fill', color).attr('font-size', '13px').attr('font-weight', 'bold').text(label);
+    g.append('line').attr('x1', legX).attr('x2', legX + 24)
+      .attr('y1', ly + 18).attr('y2', ly + 18)
+      .attr('stroke', color).attr('stroke-width', 2.5);
+    g.append('text').attr('x', legX + 28).attr('y', ly + 22)
+      .attr('fill', '#8b949e').attr('font-size', '11px').text('コール');
+    g.append('line').attr('x1', legX).attr('x2', legX + 24)
+      .attr('y1', ly + 34).attr('y2', ly + 34)
+      .attr('stroke', color).attr('stroke-width', 2).attr('stroke-dasharray', '6 3');
+    g.append('text').attr('x', legX + 28).attr('y', ly + 38)
+      .attr('fill', '#8b949e').attr('font-size', '11px').text('プット');
   }
 
   // Title
-  svg.append('text').attr('x', W / 2).attr('y', 30)
-    .attr('text-anchor', 'middle').attr('fill', '#c9d1d9').attr('font-size', '13px').attr('font-weight', 'bold')
-    .text(`NK225 ¥${spot.toLocaleString()} — IV スマイル — ${dateLabel}`);
+  svg.append('text').attr('x', W / 2).attr('y', 32)
+    .attr('text-anchor', 'middle').attr('fill', '#c9d1d9').attr('font-size', '14px').attr('font-weight', 'bold')
+    .text(`NK225 ¥${Math.round(spot).toLocaleString()} — IV スマイル — ${dateLabel}`);
 }
 
 // ── Volume ────────────────────────────────────────────────────────────────────
 function renderVolume(data, dateLabel) {
   const wrap = clearWrap('wrap-vol');
-  const W = 800, H = 480;
-  const margin = { top: 50, right: 30, bottom: 60, left: 75 };
+  const W = 840, H = 500;
+  const margin = { top: 60, right: 30, bottom: 65, left: 85 };
   const innerW = W - margin.left - margin.right;
   const innerH = H - margin.top - margin.bottom;
 
@@ -791,24 +857,41 @@ function renderVolume(data, dateLabel) {
       .attr('stroke', '#21262d').attr('stroke-width', 0.5).attr('opacity', 0.5);
   }
 
-  // Stacked bars (put on bottom, call on top)
+  // Stacked bars with tooltip
   for (const s of volStrikes) {
     const sk = String(s);
     const cv = data.call_vol[sk] || 0;
     const pv = data.put_vol[sk] || 0;
+    const tot = cv + pv;
+    if (tot === 0) continue;
     const x  = xScale(s);
     const bw = xScale.bandwidth();
 
+    // Put bar (bottom)
     if (pv > 0) {
       g.append('rect').attr('x', x).attr('y', yScale(pv)).attr('width', bw)
         .attr('height', innerH - yScale(pv))
         .attr('fill', '#f44336').attr('opacity', 0.8);
     }
+    // Call bar (top of put)
     if (cv > 0) {
       g.append('rect').attr('x', x).attr('y', yScale(pv + cv)).attr('width', bw)
-        .attr('height', innerH - yScale(cv))
+        .attr('height', yScale(pv) - yScale(pv + cv))
         .attr('fill', '#4CAF50').attr('opacity', 0.8);
     }
+
+    // Invisible overlay for tooltip
+    g.append('rect').attr('x', x).attr('y', yScale(tot)).attr('width', bw)
+      .attr('height', innerH - yScale(tot))
+      .attr('fill', 'transparent')
+      .on('mouseover', (ev) => showTip(ev,
+        `<b>¥${s.toLocaleString()}</b><br>` +
+        `コール出来高: <span style="color:#4CAF50">${Math.round(cv).toLocaleString()}枚</span><br>` +
+        `プット出来高: <span style="color:#f44336">${Math.round(pv).toLocaleString()}枚</span><br>` +
+        `合計: ${Math.round(tot).toLocaleString()}枚`
+      ))
+      .on('mousemove', moveTip)
+      .on('mouseout', hideTip);
   }
 
   // Spot line
@@ -817,21 +900,21 @@ function renderVolume(data, dateLabel) {
     const sx = xScale(nearSpot) + xScale.bandwidth() / 2;
     g.append('line').attr('x1', sx).attr('x2', sx).attr('y1', 0).attr('y2', innerH)
       .attr('stroke', '#ffd740').attr('stroke-width', 2).attr('stroke-dasharray', '6 3');
-    g.append('text').attr('x', sx + 4).attr('y', 14)
-      .attr('fill', '#ffd740').attr('font-size', '10px').attr('font-weight', 'bold')
+    g.append('text').attr('x', sx + 5).attr('y', 16)
+      .attr('fill', '#ffd740').attr('font-size', '12px').attr('font-weight', 'bold')
       .text('SPOT');
   }
 
   // Top 3 volume labels
-  for (const { strike, vol } of data.top3_vol) {
+  for (const { strike } of data.top3_vol) {
     const nearS = volStrikes.reduce((p, c) => Math.abs(c - strike) < Math.abs(p - strike) ? c : p);
     if (Math.abs(nearS - strike) > 500) continue;
     const sk = String(nearS);
     const tot = (data.call_vol[sk] || 0) + (data.put_vol[sk] || 0);
     if (tot === 0) continue;
     const x = xScale(nearS) + xScale.bandwidth() / 2;
-    g.append('text').attr('x', x).attr('y', yScale(tot) - 5)
-      .attr('text-anchor', 'middle').attr('fill', '#ffd740').attr('font-size', '9px').attr('font-weight', 'bold')
+    g.append('text').attr('x', x).attr('y', yScale(tot) - 6)
+      .attr('text-anchor', 'middle').attr('fill', '#ffd740').attr('font-size', '11px').attr('font-weight', 'bold')
       .text(Math.round(tot).toLocaleString());
   }
 
@@ -840,7 +923,7 @@ function renderVolume(data, dateLabel) {
   const xAxisG = g.append('g').attr('transform', `translate(0,${innerH})`).call(
     d3.axisBottom(xScale).tickValues(xTicks).tickFormat(d => '¥' + (+d / 1000).toFixed(0) + 'k')
   );
-  xAxisG.selectAll('text').attr('fill', '#c9d1d9').attr('font-size', '10px')
+  xAxisG.selectAll('text').attr('fill', '#c9d1d9').attr('font-size', '12px')
     .attr('transform', 'rotate(-45)').attr('text-anchor', 'end');
   xAxisG.selectAll('.domain').attr('stroke', '#30363d');
   xAxisG.selectAll('.tick line').attr('stroke', '#30363d');
@@ -849,24 +932,24 @@ function renderVolume(data, dateLabel) {
   const yAxisG = g.append('g').call(
     d3.axisLeft(yScale).ticks(5).tickFormat(d => d >= 1000 ? (d / 1000).toFixed(0) + 'k' : d)
   );
-  yAxisG.selectAll('text').attr('fill', '#8b949e').attr('font-size', '10px');
+  yAxisG.selectAll('text').attr('fill', '#8b949e').attr('font-size', '12px');
   yAxisG.selectAll('.domain').attr('stroke', '#30363d');
   yAxisG.selectAll('.tick line').attr('stroke', '#30363d');
 
   // Legend
-  g.append('rect').attr('x', innerW - 90).attr('y', 4).attr('width', 12).attr('height', 12)
+  g.append('rect').attr('x', innerW - 90).attr('y', 4).attr('width', 13).attr('height', 13)
     .attr('fill', '#4CAF50').attr('opacity', 0.8);
-  g.append('text').attr('x', innerW - 74).attr('y', 14)
-    .attr('fill', '#c9d1d9').attr('font-size', '11px').text('コール');
-  g.append('rect').attr('x', innerW - 90).attr('y', 22).attr('width', 12).attr('height', 12)
+  g.append('text').attr('x', innerW - 73).attr('y', 15)
+    .attr('fill', '#c9d1d9').attr('font-size', '13px').text('コール');
+  g.append('rect').attr('x', innerW - 90).attr('y', 24).attr('width', 13).attr('height', 13)
     .attr('fill', '#f44336').attr('opacity', 0.8);
-  g.append('text').attr('x', innerW - 74).attr('y', 32)
-    .attr('fill', '#c9d1d9').attr('font-size', '11px').text('プット');
+  g.append('text').attr('x', innerW - 73).attr('y', 35)
+    .attr('fill', '#c9d1d9').attr('font-size', '13px').text('プット');
 
   // Title
-  svg.append('text').attr('x', W / 2).attr('y', 30)
-    .attr('text-anchor', 'middle').attr('fill', '#c9d1d9').attr('font-size', '13px').attr('font-weight', 'bold')
-    .text(`NK225 ¥${data.spot.toLocaleString()} — 出来高分布 — ${dateLabel}`);
+  svg.append('text').attr('x', W / 2).attr('y', 32)
+    .attr('text-anchor', 'middle').attr('fill', '#c9d1d9').attr('font-size', '14px').attr('font-weight', 'bold')
+    .text(`NK225 ¥${Math.round(data.spot).toLocaleString()} — 出来高分布 — ${dateLabel}`);
 }
 </script>
 </body>
